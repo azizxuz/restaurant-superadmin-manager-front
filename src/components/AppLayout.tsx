@@ -21,11 +21,11 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Sozlamalar", path: "/superadmin/settings", icon: Settings },
   ],
   MANAGER: [
-    // { label: "Bosh sahifa", path: "/manager", icon: LayoutDashboard },
+    { label: "Bosh sahifa", path: "/manager", icon: LayoutDashboard },
     { label: "Filiallar", path: "/manager/branches", icon: GitBranch },
     { label: "Xodimlar", path: "/manager/staff", icon: Users },
     { label: "Mahsulotlar", path: "/manager/products", icon: Package },
-    // { label: "Buyurtmalar", path: "/manager/orders", icon: ShoppingCart },
+    { label: "Buyurtmalar", path: "/manager/orders", icon: ShoppingCart },
     { label: "Xonalar va zal", path: "/manager/rooms", icon: HomeIcon },
     { label: "Profil", path: "/manager/profile", icon: User },
     { label: "Sozlamalar", path: "/manager/settings", icon: Settings },
