@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import { getRoleBasePath, UserRole } from '@/lib/auth';
-import { LogOut, LayoutDashboard, Building2, Users, User, GitBranch, ShoppingCart, Package, Menu, X, Settings } from 'lucide-react';
+import { LogOut, LayoutDashboard, Building2, Users, User, GitBranch, ShoppingCart, Package, Menu, X, Settings,HomeIcon } from 'lucide-react';
 
 interface NavItem {
   label: string;
@@ -14,20 +14,21 @@ interface NavItem {
 
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
   SUPERADMIN: [
-    { label: 'Bosh sahifa', path: '/superadmin', icon: LayoutDashboard },
-    { label: 'Kompaniyalar', path: '/superadmin/companies', icon: Building2 },
-    { label: 'Menejerlar', path: '/superadmin/managers', icon: Users },
-    { label: 'Profil', path: '/superadmin/profile', icon: User },
-    { label: 'Sozlamalar', path: '/superadmin/settings', icon: Settings },
+    { label: "Bosh sahifa", path: "/superadmin", icon: LayoutDashboard },
+    { label: "Kompaniyalar", path: "/superadmin/companies", icon: Building2 },
+    { label: "Menejerlar", path: "/superadmin/managers", icon: Users },
+    { label: "Profil", path: "/superadmin/profile", icon: User },
+    { label: "Sozlamalar", path: "/superadmin/settings", icon: Settings },
   ],
   MANAGER: [
-    { label: 'Bosh sahifa', path: '/manager', icon: LayoutDashboard },
-    { label: 'Filiallar', path: '/manager/branches', icon: GitBranch },
-    { label: 'Xodimlar', path: '/manager/staff', icon: Users },
-    { label: 'Mahsulotlar', path: '/manager/products', icon: Package },
-    { label: 'Buyurtmalar', path: '/manager/orders', icon: ShoppingCart },
-    { label: 'Profil', path: '/manager/profile', icon: User },
-    { label: 'Sozlamalar', path: '/manager/settings', icon: Settings },
+    // { label: "Bosh sahifa", path: "/manager", icon: LayoutDashboard },
+    { label: "Filiallar", path: "/manager/branches", icon: GitBranch },
+    { label: "Xodimlar", path: "/manager/staff", icon: Users },
+    { label: "Mahsulotlar", path: "/manager/products", icon: Package },
+    // { label: "Buyurtmalar", path: "/manager/orders", icon: ShoppingCart },
+    { label: "Xonalar va zal", path: "/manager/rooms", icon: HomeIcon },
+    { label: "Profil", path: "/manager/profile", icon: User },
+    { label: "Sozlamalar", path: "/manager/settings", icon: Settings },
   ],
 };
 
@@ -75,7 +76,7 @@ export function AppLayout({ requiredRole }: AppLayoutProps) {
       `}>
         <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold text-sidebar-primary-foreground">RestoPro</h1>
+            <h1 className="text-lg font-bold text-sidebar-primary-foreground">Restourant</h1>
             <p className="text-xs text-sidebar-foreground/60 mt-1">{t('Boshqaruv tizimi', language)}</p>
           </div>
           <button onClick={closeSidebar} className="lg:hidden text-sidebar-foreground/60 hover:text-sidebar-foreground">
@@ -124,7 +125,7 @@ export function AppLayout({ requiredRole }: AppLayoutProps) {
           <button onClick={() => setSidebarOpen(true)} className="text-foreground">
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-semibold text-foreground">RestoPro</span>
+          <span className="font-semibold text-foreground">Restourant</span>
         </div>
         <div className="p-4 sm:p-6 lg:p-8">
           <Outlet />

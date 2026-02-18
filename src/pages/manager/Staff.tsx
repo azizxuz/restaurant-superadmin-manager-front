@@ -48,7 +48,14 @@ import { roleLabels, statusLabels, UserRole } from "@/lib/mock-data";
 import { Plus, Loader2, Power } from "lucide-react";
 import { toast } from "sonner";
 
-const STAFF_ROLES: UserRole[] = ["MANAGER", "AFITSANT", "CHEF", "KASSA"];
+// ✅ Xodim rollari (SUPER_AFITSANT ham qo'shilgan)
+const STAFF_ROLES: UserRole[] = [
+  "MANAGER",
+  "AFITSANT",
+  "SUPER_AFITSANT", // ← Bu yerda mavjud
+  "CHEF",
+  "KASSA",
+];
 
 export default function ManagerStaff() {
   const { user } = useAuth();
@@ -302,7 +309,12 @@ export default function ManagerStaff() {
         lastName: form.lastName.trim(),
         phoneNumer: form.phoneNumer.trim(),
         password: form.password.trim(),
-        role: form.role as "MANAGER" | "AFITSANT" | "CHEF" | "KASSA",
+        role: form.role as
+          | "MANAGER"
+          | "AFITSANT"
+          | "CHEF"
+          | "KASSA"
+          | "SUPER_AFITSANT",
         branchId: form.branchId,
       };
       console.log("➕ Create payload:", payload);

@@ -1,30 +1,26 @@
-import api from '@/lib/api';
+import api from "@/lib/api";
 
 export interface CategoryPayload {
   name: string;
   branchId: string;
-  icon?: File;
 }
 
-export interface CategoryListParams {
-  search?: string;
-  offset?: number;
-  limit?: number;
+export interface CategoryUpdatePayload {
+  name: string;
 }
 
 export const categoryService = {
-  getByBranch: (branchId: string, params?: CategoryListParams) =>
-    api.get(`/category/all/manager/${branchId}`, { params }),
+  getByBranch: (branchId: string) =>
+    api.get(`/category/all/manager/${branchId}`),
 
-  create: (data: CategoryPayload) => {
-    const formData = new FormData();
-    formData.append('name', data.name);
-    formData.append('branchId', data.branchId);
-    if (data.icon) formData.append('icon', data.icon);
-    return api.post('/category', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
+  getAll: () => api.get("/category"),
+
+  create: (data: CategoryPayload) => api.post("/category", data),
+
+  update: (id: string, data: CategoryUpdatePayload) =>
+    api.put(`/category/${id}`, data),
 
   toggleStatus: (id: string) => api.patch(`/category/status/${id}`),
+
+  delete: (id: string) => api.delete(`/category/${id}`),
 };

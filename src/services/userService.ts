@@ -6,7 +6,7 @@ export interface StaffPayload {
   lastName: string;
   phoneNumer: string; // ✅ Backend typo: "phoneNumer" (not "phoneNumber")
   password: string;
-  role: "MANAGER" | "AFITSANT" | "CHEF" | "KASSA";
+  role: "MANAGER" | "AFITSANT" | "CHEF" | "KASSA" | "SUPER_AFITSANT";
   branchId: string;
 }
 

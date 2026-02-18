@@ -39,32 +39,36 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { productService } from "@/services/productService";
-import { categoryService } from "@/services/categoryService";
+import { roomService } from "@/services/roomService";
+import { roomCategoryService } from "@/services/roomCategoryService";
 import { branchService, BranchResponse } from "@/services/branchService";
 import { formatPrice, statusLabels } from "@/lib/mock-data";
-import { Plus, Loader2, Store, RefreshCw, MapPin } from "lucide-react";
+import {
+  Plus,
+  Loader2,
+  Store,
+  RefreshCw,
+  MapPin,
+  BedDouble,
+} from "lucide-react";
 import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StatusType = "ACTIVE" | "INACTIVE";
 
-interface ProductCategory {
+interface RoomCategory {
   id: string;
   name: string;
   branchId: string;
   status: StatusType;
 }
 
-interface Product {
+interface Room {
   id: string;
   name: string;
-  desc: string;
   price: number;
-  amount: number;
-  unit: string;
   branchId: string;
-  productCategoryId: string;
+  roomCategoryId: string;
   status: StatusType;
 }
 
@@ -81,28 +85,27 @@ function toArray<T>(raw: unknown): T[] {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function ManagerProducts() {
+export default function ManagerRooms() {
   const queryClient = useQueryClient();
 
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState("products");
+  const [activeTab, setActiveTab] = useState("rooms");
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("ALL");
 
-  // Product dialog
-  const [prodDialog, setProdDialog] = useState(false);
-  const [editProd, setEditProd] = useState<Product | null>(null);
-  const [prodForm, setProdForm] = useState({
+  // Room dialog
+  const [roomDialog, setRoomDialog] = useState(false);
+  const [editRoom, setEditRoom] = useState<Room | null>(null);
+  const [roomForm, setRoomForm] = useState({
     name: "",
-    desc: "",
     price: "",
-    productCategoryId: "",
+    roomCategoryId: "",
   });
-  const [deleteProdId, setDeleteProdId] = useState<string | null>(null);
+  const [deleteRoomId, setDeleteRoomId] = useState<string | null>(null);
 
   // Category dialog
   const [catDialog, setCatDialog] = useState(false);
-  const [editCat, setEditCat] = useState<ProductCategory | null>(null);
+  const [editCat, setEditCat] = useState<RoomCategory | null>(null);
   const [catName, setCatName] = useState("");
   const [deleteCatId, setDeleteCatId] = useState<string | null>(null);
 
@@ -127,101 +130,91 @@ export default function ManagerProducts() {
     }
   }, [selectedBranchId]);
 
-  // ─── Categories ───────────────────────────────────────────────────────────
+  // ─── Room Categories ───────────────────────────────────────────────────────
   const {
     data: catsRaw,
     isLoading: catsLoading,
     refetch: refetchCats,
   } = useQuery({
-    queryKey: ["categories", selectedBranchId],
+    queryKey: ["room-categories", selectedBranchId],
     queryFn: () =>
-      categoryService.getByBranch(selectedBranchId).then((r) => r.data),
+      roomCategoryService.getByBranch(selectedBranchId).then((r) => r.data),
     enabled: !!selectedBranchId,
   });
-  const categories = toArray<ProductCategory>(catsRaw);
+  const categories = toArray<RoomCategory>(catsRaw);
   const activeCats = categories.filter((c) => c.status === "ACTIVE");
 
-  // ─── Products ─────────────────────────────────────────────────────────────
+  // ─── Rooms ────────────────────────────────────────────────────────────────
   const {
-    data: prodsRaw,
-    isLoading: prodsLoading,
-    refetch: refetchProds,
+    data: roomsRaw,
+    isLoading: roomsLoading,
+    refetch: refetchRooms,
   } = useQuery({
-    queryKey: ["products", selectedBranchId],
+    queryKey: ["rooms", selectedBranchId],
     queryFn: () =>
-      productService.getByBranch(selectedBranchId).then((r) => r.data),
+      roomService.getByBranch(selectedBranchId).then((r) => r.data),
     enabled: !!selectedBranchId,
   });
-  const productsList = toArray<Product>(prodsRaw);
+  const roomsList = toArray<Room>(roomsRaw);
 
   const selectedBranch = branches.find((b) => b.id === selectedBranchId);
 
-  // ─── Product mutations ────────────────────────────────────────────────────
-  const createProductMutation = useMutation({
-    mutationFn: (data: Parameters<typeof productService.create>[0]) =>
-      productService.create(data),
+  // ─── Room mutations ───────────────────────────────────────────────────────
+  const createRoomMutation = useMutation({
+    mutationFn: (data: Parameters<typeof roomService.create>[0]) =>
+      roomService.create(data),
     onSuccess: () => {
-      toast.success("Mahsulot yaratildi");
-      queryClient.invalidateQueries({
-        queryKey: ["products", selectedBranchId],
-      });
-      setProdDialog(false);
+      toast.success("Xona yaratildi");
+      queryClient.invalidateQueries({ queryKey: ["rooms", selectedBranchId] });
+      setRoomDialog(false);
     },
-    onError: () => toast.error("Mahsulot yaratishda xatolik"),
+    onError: () => toast.error("Xona yaratishda xatolik"),
   });
 
-  const updateProductMutation = useMutation({
+  const updateRoomMutation = useMutation({
     mutationFn: ({
       id,
       data,
     }: {
       id: string;
-      data: Parameters<typeof productService.update>[1];
-    }) => productService.update(id, data),
+      data: Parameters<typeof roomService.update>[1];
+    }) => roomService.update(id, data),
     onSuccess: () => {
-      toast.success("Mahsulot yangilandi");
-      queryClient.invalidateQueries({
-        queryKey: ["products", selectedBranchId],
-      });
-      setProdDialog(false);
+      toast.success("Xona yangilandi");
+      queryClient.invalidateQueries({ queryKey: ["rooms", selectedBranchId] });
+      setRoomDialog(false);
     },
-    onError: () => toast.error("Mahsulot yangilashda xatolik"),
+    onError: () => toast.error("Xona yangilashda xatolik"),
   });
 
-  const deleteProductMutation = useMutation({
-    mutationFn: (id: string) => productService.delete(id),
+  const deleteRoomMutation = useMutation({
+    mutationFn: (id: string) => roomService.delete(id),
     onSuccess: () => {
-      toast.success("Mahsulot o'chirildi");
-      queryClient.invalidateQueries({
-        queryKey: ["products", selectedBranchId],
-      });
-      setDeleteProdId(null);
+      toast.success("Xona o'chirildi");
+      queryClient.invalidateQueries({ queryKey: ["rooms", selectedBranchId] });
+      setDeleteRoomId(null);
     },
     onError: () => toast.error("O'chirishda xatolik"),
   });
 
-  const toggleProductMutation = useMutation({
-    mutationFn: (id: string) => productService.toggleStatus(id),
+  const toggleRoomMutation = useMutation({
+    mutationFn: (id: string) => roomService.toggleStatus(id),
     onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["products", selectedBranchId],
-      }),
+      queryClient.invalidateQueries({ queryKey: ["rooms", selectedBranchId] }),
     onError: () => {
       toast.error("Holat o'zgartirishda xatolik");
-      queryClient.invalidateQueries({
-        queryKey: ["products", selectedBranchId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["rooms", selectedBranchId] });
     },
   });
 
   // ─── Category mutations ───────────────────────────────────────────────────
   const createCategoryMutation = useMutation({
-    mutationFn: (data: Parameters<typeof categoryService.create>[0]) =>
-      categoryService.create(data),
+    mutationFn: (data: Parameters<typeof roomCategoryService.create>[0]) =>
+      roomCategoryService.create(data),
     onSuccess: () => {
       toast.success("Kategoriya yaratildi");
       queryClient.invalidateQueries({
-        queryKey: ["categories", selectedBranchId],
+        queryKey: ["room-categories", selectedBranchId],
       });
       setCatDialog(false);
     },
@@ -234,12 +227,12 @@ export default function ManagerProducts() {
       data,
     }: {
       id: string;
-      data: Parameters<typeof categoryService.update>[1];
-    }) => categoryService.update(id, data),
+      data: Parameters<typeof roomCategoryService.update>[1];
+    }) => roomCategoryService.update(id, data),
     onSuccess: () => {
       toast.success("Kategoriya yangilandi");
       queryClient.invalidateQueries({
-        queryKey: ["categories", selectedBranchId],
+        queryKey: ["room-categories", selectedBranchId],
       });
       setCatDialog(false);
     },
@@ -247,89 +240,81 @@ export default function ManagerProducts() {
   });
 
   const deleteCategoryMutation = useMutation({
-    mutationFn: (id: string) => categoryService.delete(id),
+    mutationFn: (id: string) => roomCategoryService.delete(id),
     onSuccess: () => {
       toast.success("Kategoriya o'chirildi");
       queryClient.invalidateQueries({
-        queryKey: ["categories", selectedBranchId],
+        queryKey: ["room-categories", selectedBranchId],
       });
-      queryClient.invalidateQueries({
-        queryKey: ["products", selectedBranchId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["rooms", selectedBranchId] });
       setDeleteCatId(null);
     },
     onError: () => toast.error("O'chirishda xatolik"),
   });
 
   const toggleCategoryMutation = useMutation({
-    mutationFn: (id: string) => categoryService.toggleStatus(id),
+    mutationFn: (id: string) => roomCategoryService.toggleStatus(id),
     onSuccess: () =>
       queryClient.invalidateQueries({
-        queryKey: ["categories", selectedBranchId],
+        queryKey: ["room-categories", selectedBranchId],
       }),
     onError: () => {
       toast.error("Holat o'zgartirishda xatolik");
       queryClient.invalidateQueries({
-        queryKey: ["categories", selectedBranchId],
+        queryKey: ["room-categories", selectedBranchId],
       });
     },
   });
 
   // ─── Filtered ─────────────────────────────────────────────────────────────
-  const filteredProducts = productsList.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = catFilter === "ALL" || p.productCategoryId === catFilter;
+  const filteredRooms = roomsList.filter((r) => {
+    const matchSearch = r.name.toLowerCase().includes(search.toLowerCase());
+    const matchCat = catFilter === "ALL" || r.roomCategoryId === catFilter;
     return matchSearch && matchCat;
   });
 
-  // ─── Product handlers ─────────────────────────────────────────────────────
-  const openAddProd = () => {
-    setEditProd(null);
-    setProdForm({
+  // ─── Room handlers ────────────────────────────────────────────────────────
+  const openAddRoom = () => {
+    setEditRoom(null);
+    setRoomForm({
       name: "",
-      desc: "",
       price: "",
-      productCategoryId: activeCats[0]?.id || "",
+      roomCategoryId: activeCats[0]?.id || "",
     });
-    setProdDialog(true);
+    setRoomDialog(true);
   };
 
-  const openEditProd = (p: Product) => {
-    setEditProd(p);
-    setProdForm({
-      name: p.name,
-      desc: p.desc,
-      price: String(p.price),
-      productCategoryId: p.productCategoryId,
+  const openEditRoom = (r: Room) => {
+    setEditRoom(r);
+    setRoomForm({
+      name: r.name,
+      price: String(r.price),
+      roomCategoryId: r.roomCategoryId,
     });
-    setProdDialog(true);
+    setRoomDialog(true);
   };
 
-  const saveProd = () => {
-    if (!prodForm.name.trim()) return toast.error("Mahsulot nomini kiriting");
-    if (!prodForm.price || isNaN(Number(prodForm.price)))
+  const saveRoom = () => {
+    if (!roomForm.name.trim()) return toast.error("Xona nomini kiriting");
+    if (!roomForm.price || isNaN(Number(roomForm.price)))
       return toast.error("Narxni to'g'ri kiriting");
-    if (!prodForm.productCategoryId) return toast.error("Kategoriyani tanlang");
+    if (!roomForm.roomCategoryId) return toast.error("Kategoriyani tanlang");
 
-    if (editProd) {
-      updateProductMutation.mutate({
-        id: editProd.id,
+    if (editRoom) {
+      updateRoomMutation.mutate({
+        id: editRoom.id,
         data: {
-          name: prodForm.name,
-          desc: prodForm.desc,
-          price: Number(prodForm.price),
-          productCategoryId: prodForm.productCategoryId,
+          name: roomForm.name,
+          price: Number(roomForm.price),
+          roomCategoryId: roomForm.roomCategoryId,
         },
       });
     } else {
-      createProductMutation.mutate({
-        name: prodForm.name,
-        desc: prodForm.desc,
-        price: Number(prodForm.price),
-        amount: 0,
-        unit: "DONA",
+      createRoomMutation.mutate({
+        name: roomForm.name,
+        price: Number(roomForm.price),
         branchId: selectedBranchId,
-        productCategoryId: prodForm.productCategoryId,
+        roomCategoryId: roomForm.roomCategoryId,
       });
     }
   };
@@ -341,7 +326,7 @@ export default function ManagerProducts() {
     setCatDialog(true);
   };
 
-  const openEditCat = (c: ProductCategory) => {
+  const openEditCat = (c: RoomCategory) => {
     setEditCat(c);
     setCatName(c.name);
     setCatDialog(true);
@@ -362,8 +347,8 @@ export default function ManagerProducts() {
     }
   };
 
-  const isProdSaving =
-    createProductMutation.isPending || updateProductMutation.isPending;
+  const isRoomSaving =
+    createRoomMutation.isPending || updateRoomMutation.isPending;
   const isCatSaving =
     createCategoryMutation.isPending || updateCategoryMutation.isPending;
 
@@ -373,9 +358,9 @@ export default function ManagerProducts() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Mahsulotlar</h2>
+          <h2 className="text-2xl font-bold text-foreground">Xonalar</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Filial bo'yicha mahsulot va kategoriyalarni boshqaring
+            Filial bo'yicha xona va kategoriyalarni boshqaring
           </p>
         </div>
         <Button
@@ -383,7 +368,7 @@ export default function ManagerProducts() {
           size="sm"
           onClick={() => {
             refetchCats();
-            refetchProds();
+            refetchRooms();
           }}
           className="gap-1.5"
           disabled={!selectedBranchId}
@@ -442,8 +427,8 @@ export default function ManagerProducts() {
             {selectedBranchId && (
               <div className="flex gap-5 text-center shrink-0">
                 <div>
-                  <p className="text-lg font-bold">{productsList.length}</p>
-                  <p className="text-xs text-muted-foreground">Mahsulot</p>
+                  <p className="text-lg font-bold">{roomsList.length}</p>
+                  <p className="text-xs text-muted-foreground">Xona</p>
                 </div>
                 <div className="w-px bg-border" />
                 <div>
@@ -453,7 +438,7 @@ export default function ManagerProducts() {
                 <div className="w-px bg-border" />
                 <div>
                   <p className="text-lg font-bold text-green-600">
-                    {productsList.filter((p) => p.status === "ACTIVE").length}
+                    {roomsList.filter((r) => r.status === "ACTIVE").length}
                   </p>
                   <p className="text-xs text-muted-foreground">Faol</p>
                 </div>
@@ -470,11 +455,11 @@ export default function ManagerProducts() {
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
-            <TabsTrigger value="products">
-              Mahsulotlar
-              {productsList.length > 0 && (
+            <TabsTrigger value="rooms">
+              Xonalar
+              {roomsList.length > 0 && (
                 <Badge variant="secondary" className="ml-1.5 px-1.5 text-xs">
-                  {productsList.length}
+                  {roomsList.length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -488,12 +473,12 @@ export default function ManagerProducts() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ══ Products ══════════════════════════════════════════════════════ */}
-          <TabsContent value="products">
+          {/* ══ Rooms ══════════════════════════════════════════════════════ */}
+          <TabsContent value="rooms">
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
               <div className="flex gap-2 flex-1 min-w-0">
                 <Input
-                  placeholder="Mahsulot qidirish..."
+                  placeholder="Xona qidirish..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="max-w-xs"
@@ -523,17 +508,17 @@ export default function ManagerProducts() {
                 </Select>
               </div>
               <Button
-                onClick={openAddProd}
+                onClick={openAddRoom}
                 size="sm"
                 disabled={activeCats.length === 0}
               >
-                <Plus className="h-4 w-4 mr-1" /> Mahsulot qo'shish
+                <Plus className="h-4 w-4 mr-1" /> Xona qo'shish
               </Button>
             </div>
 
             {activeCats.length === 0 && !catsLoading && (
               <div className="text-center py-3 text-sm text-amber-700 bg-amber-50 rounded-lg border border-amber-200 mb-4">
-                ⚠️ Mahsulot qo'shish uchun avval faol kategoriya yarating
+                ⚠️ Xona qo'shish uchun avval faol kategoriya yarating
               </div>
             )}
 
@@ -542,7 +527,6 @@ export default function ManagerProducts() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nomi</TableHead>
-                    <TableHead>Tavsif</TableHead>
                     <TableHead>Kategoriya</TableHead>
                     <TableHead>Narx</TableHead>
                     <TableHead>Holat</TableHead>
@@ -550,35 +534,35 @@ export default function ManagerProducts() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {prodsLoading ? (
+                  {roomsLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-10">
+                      <TableCell colSpan={5} className="text-center py-10">
                         <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
                       </TableCell>
                     </TableRow>
-                  ) : filteredProducts.length === 0 ? (
+                  ) : filteredRooms.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={5}
                         className="text-center text-muted-foreground py-10"
                       >
                         {search || catFilter !== "ALL"
                           ? "Qidiruv natijasi topilmadi"
-                          : "Mahsulotlar mavjud emas"}
+                          : "Xonalar mavjud emas"}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredProducts.map((p) => {
+                    filteredRooms.map((r) => {
                       const cat = categories.find(
-                        (c) => c.id === p.productCategoryId
+                        (c) => c.id === r.roomCategoryId
                       );
                       return (
-                        <TableRow key={p.id}>
+                        <TableRow key={r.id}>
                           <TableCell className="font-medium">
-                            {p.name}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground max-w-[200px] truncate text-sm">
-                            {p.desc || "—"}
+                            <div className="flex items-center gap-2">
+                              <BedDouble className="h-4 w-4 text-muted-foreground" />
+                              {r.name}
+                            </div>
                           </TableCell>
                           <TableCell>
                             {cat ? (
@@ -590,26 +574,26 @@ export default function ManagerProducts() {
                             )}
                           </TableCell>
                           <TableCell className="font-semibold">
-                            {formatPrice(p.price)}
+                            {formatPrice(r.price)}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Switch
-                                checked={p.status === "ACTIVE"}
+                                checked={r.status === "ACTIVE"}
                                 onCheckedChange={() =>
-                                  toggleProductMutation.mutate(p.id)
+                                  toggleRoomMutation.mutate(r.id)
                                 }
-                                disabled={toggleProductMutation.isPending}
+                                disabled={toggleRoomMutation.isPending}
                               />
                               <Badge
                                 variant={
-                                  p.status === "ACTIVE"
+                                  r.status === "ACTIVE"
                                     ? "default"
                                     : "secondary"
                                 }
                                 className="text-xs"
                               >
-                                {statusLabels[p.status]}
+                                {statusLabels[r.status]}
                               </Badge>
                             </div>
                           </TableCell>
@@ -617,7 +601,7 @@ export default function ManagerProducts() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => openEditProd(p)}
+                              onClick={() => openEditRoom(r)}
                             >
                               Tahrirlash
                             </Button>
@@ -625,7 +609,7 @@ export default function ManagerProducts() {
                               variant="ghost"
                               size="sm"
                               className="text-destructive hover:text-destructive"
-                              onClick={() => setDeleteProdId(p.id)}
+                              onClick={() => setDeleteRoomId(r.id)}
                             >
                               O'chirish
                             </Button>
@@ -646,7 +630,7 @@ export default function ManagerProducts() {
                 <span className="font-medium text-foreground">
                   {selectedBranch?.name}
                 </span>{" "}
-                filialining kategoriyalari
+                filialining xona kategoriyalari
               </p>
               <Button onClick={openAddCat} size="sm">
                 <Plus className="h-4 w-4 mr-1" /> Kategoriya qo'shish
@@ -658,7 +642,7 @@ export default function ManagerProducts() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nomi</TableHead>
-                    <TableHead>Mahsulotlar</TableHead>
+                    <TableHead>Xonalar</TableHead>
                     <TableHead>Holat</TableHead>
                     <TableHead className="text-right">Amallar</TableHead>
                   </TableRow>
@@ -681,8 +665,8 @@ export default function ManagerProducts() {
                     </TableRow>
                   ) : (
                     categories.map((c) => {
-                      const prodCount = productsList.filter(
-                        (p) => p.productCategoryId === c.id
+                      const roomCount = roomsList.filter(
+                        (r) => r.roomCategoryId === c.id
                       ).length;
                       return (
                         <TableRow key={c.id}>
@@ -690,7 +674,7 @@ export default function ManagerProducts() {
                             {c.name}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="secondary">{prodCount} ta</Badge>
+                            <Badge variant="secondary">{roomCount} ta</Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -741,12 +725,12 @@ export default function ManagerProducts() {
         </Tabs>
       )}
 
-      {/* ══ Product Dialog ════════════════════════════════════════════════════ */}
-      <Dialog open={prodDialog} onOpenChange={setProdDialog}>
+      {/* ══ Room Dialog ═══════════════════════════════════════════════════════ */}
+      <Dialog open={roomDialog} onOpenChange={setRoomDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editProd ? "Mahsulotni tahrirlash" : "Yangi mahsulot qo'shish"}
+              {editRoom ? "Xonani tahrirlash" : "Yangi xona qo'shish"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -755,21 +739,10 @@ export default function ManagerProducts() {
                 Nomi <span className="text-destructive">*</span>
               </Label>
               <Input
-                placeholder="Mahsulot nomini kiriting"
-                value={prodForm.name}
+                placeholder="Xona nomini kiriting"
+                value={roomForm.name}
                 onChange={(e) =>
-                  setProdForm({ ...prodForm, name: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Tavsif</Label>
-              <Input
-                placeholder="Qisqacha tavsif (ixtiyoriy)"
-                value={prodForm.desc}
-                onChange={(e) =>
-                  setProdForm({ ...prodForm, desc: e.target.value })
+                  setRoomForm({ ...roomForm, name: e.target.value })
                 }
               />
             </div>
@@ -783,9 +756,9 @@ export default function ManagerProducts() {
                   type="number"
                   placeholder="0"
                   min={0}
-                  value={prodForm.price}
+                  value={roomForm.price}
                   onChange={(e) =>
-                    setProdForm({ ...prodForm, price: e.target.value })
+                    setRoomForm({ ...roomForm, price: e.target.value })
                   }
                 />
               </div>
@@ -794,9 +767,9 @@ export default function ManagerProducts() {
                   Kategoriya <span className="text-destructive">*</span>
                 </Label>
                 <Select
-                  value={prodForm.productCategoryId}
+                  value={roomForm.roomCategoryId}
                   onValueChange={(v) =>
-                    setProdForm({ ...prodForm, productCategoryId: v })
+                    setRoomForm({ ...roomForm, roomCategoryId: v })
                   }
                 >
                   <SelectTrigger>
@@ -827,16 +800,16 @@ export default function ManagerProducts() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setProdDialog(false)}
-              disabled={isProdSaving}
+              onClick={() => setRoomDialog(false)}
+              disabled={isRoomSaving}
             >
               Bekor qilish
             </Button>
-            <Button onClick={saveProd} disabled={isProdSaving}>
-              {isProdSaving && (
+            <Button onClick={saveRoom} disabled={isRoomSaving}>
+              {isRoomSaving && (
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
               )}
-              {editProd ? "Saqlash" : "Qo'shish"}
+              {editRoom ? "Saqlash" : "Qo'shish"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -891,28 +864,28 @@ export default function ManagerProducts() {
         </DialogContent>
       </Dialog>
 
-      {/* ══ Delete Product ════════════════════════════════════════════════════ */}
+      {/* ══ Delete Room ═══════════════════════════════════════════════════════ */}
       <AlertDialog
-        open={!!deleteProdId}
-        onOpenChange={() => setDeleteProdId(null)}
+        open={!!deleteRoomId}
+        onOpenChange={() => setDeleteRoomId(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mahsulotni o'chirish</AlertDialogTitle>
+            <AlertDialogTitle>Xonani o'chirish</AlertDialogTitle>
             <AlertDialogDescription>
-              Bu mahsulot butunlay o'chiriladi. Qaytarib bo'lmaydi.
+              Bu xona butunlay o'chiriladi. Qaytarib bo'lmaydi.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>
-                deleteProdId && deleteProductMutation.mutate(deleteProdId)
+                deleteRoomId && deleteRoomMutation.mutate(deleteRoomId)
               }
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteProductMutation.isPending}
+              disabled={deleteRoomMutation.isPending}
             >
-              {deleteProductMutation.isPending && (
+              {deleteRoomMutation.isPending && (
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
               )}
               O'chirish
@@ -933,11 +906,10 @@ export default function ManagerProducts() {
               Unga bog'liq{" "}
               <strong>
                 {deleteCatId
-                  ? productsList.filter(
-                      (p) => p.productCategoryId === deleteCatId
-                    ).length
+                  ? roomsList.filter((r) => r.roomCategoryId === deleteCatId)
+                      .length
                   : 0}{" "}
-                ta mahsulot
+                ta xona
               </strong>{" "}
               ham o'chishi mumkin. Davom etasizmi?
             </AlertDialogDescription>

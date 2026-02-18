@@ -39,7 +39,7 @@ import {
 } from "@/services/branchService";
 import { userService } from "@/services/userService";
 import { statusLabels } from "@/lib/mock-data";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Percent } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ManagerBranches() {
@@ -50,9 +50,9 @@ export default function ManagerBranches() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editItem, setEditItem] = useState<BranchResponse | null>(null);
-  const [form, setForm] = useState({ name: "", addres: "" });
+  const [form, setForm] = useState({ name: "", addres: "", kpi: "" });
 
-  // 📦 Serverdan filiallarni olish
+  // 📦 Filiallarni olish
   const {
     data: branchData,
     isLoading: branchesLoading,
@@ -64,18 +64,15 @@ export default function ManagerBranches() {
 
   const branchList: BranchResponse[] = branchData?.data || [];
 
-  // 📦 Barcha xodimlarni olish (barcha filiallar uchun)
+  // 📦 Xodimlarni olish
   const { data: allUsersData } = useQuery({
     queryKey: ["all-users"],
     queryFn: async () => {
       try {
-        // Barcha filiallardan xodimlarni olish
         const allStaff = [];
         for (const branch of branchList) {
           try {
             const response = await userService.getStaffByBranch(branch.id);
-
-            // Response strukturasini tekshirish
             let staffData = [];
             if (response?.data?.data && Array.isArray(response.data.data)) {
               staffData = response.data.data;
@@ -84,7 +81,6 @@ export default function ManagerBranches() {
             } else if (Array.isArray(response)) {
               staffData = response;
             }
-
             allStaff.push(...staffData);
           } catch (err) {
             console.error(`Error fetching staff for branch ${branch.id}:`, err);
@@ -101,7 +97,7 @@ export default function ManagerBranches() {
 
   const allUsers = Array.isArray(allUsersData) ? allUsersData : [];
 
-  // ✅ Filial yaratish
+  // ✅ Yaratish
   const createMutation = useMutation({
     mutationFn: (data: BranchPayload) => branchService.create(data),
     onSuccess: () => {
@@ -109,15 +105,14 @@ export default function ManagerBranches() {
       queryClient.invalidateQueries({ queryKey: ["branches"] });
       queryClient.invalidateQueries({ queryKey: ["all-users"] });
       setDialogOpen(false);
-      setForm({ name: "", addres: "" });
+      setForm({ name: "", addres: "", kpi: "" });
     },
     onError: (error: any) => {
-      console.error("Create error:", error);
       toast.error(error?.response?.data?.message || "Xatolik yuz berdi");
     },
   });
 
-  // ✅ Filial tahrirlash
+  // ✅ Tahrirlash
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: BranchPayload }) =>
       branchService.update(id, data),
@@ -126,15 +121,14 @@ export default function ManagerBranches() {
       queryClient.invalidateQueries({ queryKey: ["branches"] });
       setDialogOpen(false);
       setEditItem(null);
-      setForm({ name: "", addres: "" });
+      setForm({ name: "", addres: "", kpi: "" });
     },
     onError: (error: any) => {
-      console.error("Update error:", error);
       toast.error(error?.response?.data?.message || "Xatolik yuz berdi");
     },
   });
 
-  // ✅ Filial o'chirish
+  // ✅ O'chirish
   const deleteMutation = useMutation({
     mutationFn: (id: string) => branchService.delete(id),
     onSuccess: () => {
@@ -144,7 +138,6 @@ export default function ManagerBranches() {
       setDeleteId(null);
     },
     onError: (error: any) => {
-      console.error("Delete error:", error);
       toast.error(error?.response?.data?.message || "Xatolik yuz berdi");
     },
   });
@@ -156,7 +149,6 @@ export default function ManagerBranches() {
       queryClient.invalidateQueries({ queryKey: ["branches"] });
     },
     onError: (error: any) => {
-      console.error("Toggle error:", error);
       toast.error(error?.response?.data?.message || "Xatolik yuz berdi");
     },
   });
@@ -165,52 +157,50 @@ export default function ManagerBranches() {
     b.name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Xodimlar sonini hisoblash funksiyasi
-  const getStaffCount = (branchId: string): number => {
-    return allUsers.filter((u) => u.branchId === branchId).length;
-  };
+  const getStaffCount = (branchId: string): number =>
+    allUsers.filter((u) => u.branchId === branchId).length;
 
   // --- Dialoglar ---
   const openAdd = () => {
     setEditItem(null);
-    setForm({ name: "", addres: "" });
+    setForm({ name: "", addres: "", kpi: "" });
     setDialogOpen(true);
   };
 
   const openEdit = (b: BranchResponse) => {
     setEditItem(b);
-    setForm({ name: b.name, addres: b.addres || "" });
+    setForm({
+      name: b.name,
+      addres: b.addres || "",
+      kpi: b.kpi != null ? String(b.kpi) : "",
+    });
     setDialogOpen(true);
   };
 
   const handleSave = () => {
-    // Validatsiya
     if (!form.name.trim()) {
       toast.error("Filial nomini kiriting");
+      return;
+    }
+    const kpiValue = Number(form.kpi);
+    if (
+      form.kpi !== "" &&
+      (isNaN(kpiValue) || kpiValue < 0 || kpiValue > 100)
+    ) {
+      toast.error("KPI 0 dan 100 gacha bo'lishi kerak");
       return;
     }
 
     const payload: BranchPayload = {
       name: form.name.trim(),
       addres: form.addres.trim(),
+      kpi: form.kpi === "" ? 0 : kpiValue,
     };
 
     if (editItem) {
-      // ✅ Tahrirlash
       updateMutation.mutate({ id: editItem.id, data: payload });
     } else {
-      // ✅ Yangi filial yaratish
       createMutation.mutate(payload);
-    }
-  };
-
-  const toggleStatus = (id: string) => {
-    toggleMutation.mutate(id);
-  };
-
-  const handleDelete = () => {
-    if (deleteId) {
-      deleteMutation.mutate(deleteId);
     }
   };
 
@@ -264,6 +254,7 @@ export default function ManagerBranches() {
               <TableHead>Nomi</TableHead>
               <TableHead>Manzil</TableHead>
               <TableHead>Xodimlar</TableHead>
+              <TableHead>KPI (afitsant ulushi)</TableHead>
               <TableHead>Holat</TableHead>
               <TableHead className="text-right">Amallar</TableHead>
             </TableRow>
@@ -281,10 +272,25 @@ export default function ManagerBranches() {
                     <Badge variant="secondary">{staffCount}</Badge>
                   </TableCell>
                   <TableCell>
+                    {b.kpi != null ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-md px-2 py-0.5 text-sm font-semibold w-fit">
+                          <Percent className="h-3.5 w-3.5" />
+                          {b.kpi}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          har buyurtmadan
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-2">
                       <Switch
                         checked={b.status === "ACTIVE"}
-                        onCheckedChange={() => toggleStatus(b.id)}
+                        onCheckedChange={() => toggleMutation.mutate(b.id)}
                         disabled={toggleMutation.isPending}
                       />
                       <span className="text-sm text-muted-foreground">
@@ -316,7 +322,7 @@ export default function ManagerBranches() {
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center text-muted-foreground py-8"
                 >
                   {search ? "Filial topilmadi" : "Hozircha filiallar yo'q"}
@@ -327,7 +333,7 @@ export default function ManagerBranches() {
         </Table>
       </Card>
 
-      {/* Qo'shish/Tahrirlash Dialog */}
+      {/* Qo'shish / Tahrirlash Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -337,13 +343,16 @@ export default function ManagerBranches() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Nomi *</Label>
+              <Label>
+                Nomi <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Filial nomi"
               />
             </div>
+
             <div className="space-y-2">
               <Label>Manzil</Label>
               <Input
@@ -352,7 +361,33 @@ export default function ManagerBranches() {
                 placeholder="Filial manzili"
               />
             </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Percent className="h-3.5 w-3.5 text-muted-foreground" />
+                Afitsant KPI ulushi (%)
+              </Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={form.kpi}
+                  onChange={(e) => setForm({ ...form, kpi: e.target.value })}
+                  placeholder="Masalan: 10"
+                  className="pr-8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                  %
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Afitsant har bir buyurtmadan oladigan foiz ulushi. 0–100
+                oralig'ida kiriting.
+              </p>
+            </div>
           </div>
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -386,7 +421,7 @@ export default function ManagerBranches() {
               Bekor qilish
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
               disabled={deleteMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

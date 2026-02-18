@@ -2,8 +2,9 @@ import api from "@/lib/api";
 
 export interface BranchPayload {
   name: string;
-  addres: string; // ✅ Backend "addres" kutadi (typo bor backendda)
-  companyId?: string; // ✅ Optional qilamiz
+  addres: string;
+  companyId?: string;
+  kpi: number; // ✅ Afitsant uchun xizmat ulushi foizi (%)
 }
 
 export interface BranchResponse {
@@ -11,6 +12,7 @@ export interface BranchResponse {
   name: string;
   addres: string;
   companyId: string;
+  kpi: number;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -19,7 +21,7 @@ export interface BranchResponse {
 export const branchService = {
   getById: (id: string) => api.get(`/branch/${id}`),
 
-  getAll: () => api.get(`/branch/my`), // ✅ To'g'ri endpoint
+  getAll: () => api.get(`/branch/my`),
 
   create: (data: BranchPayload) => api.post("/branch/", data),
 

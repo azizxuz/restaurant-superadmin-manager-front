@@ -10,8 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 
 const DEMO_ACCOUNTS = [
-  { label: 'Super Admin', phone: '+998901234567', password: 'admin123' },
-  { label: 'Menejer', phone: '+998901234568', password: 'manager123' },
+  { label: "Super Admin", phone: "+998335242981", password: "password" },
+  { label: "Menejer", phone: "+998991234569", password: "12345678" },
 ];
 
 export default function Login() {
@@ -52,7 +52,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm p-6 sm:p-8">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-foreground">RestoPro</h1>
+          <h1 className="text-2xl font-bold text-foreground">Restourant</h1>
           <p className="text-sm text-muted-foreground mt-1">{t('Tizimga kirish', language)}</p>
         </div>
 
