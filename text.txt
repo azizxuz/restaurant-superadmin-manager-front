@@ -1,0 +1,4 @@
+1. Moliya qoshish
+2. Dashboard toliq qilish
+3. Oshhona frontga qoshish
+4. Xarajatlar qoshish
