@@ -1,34 +1,36 @@
 import api from "@/lib/api";
 
 export interface ProductPayload {
-  name: string;
-  desc: string;
-  price: number;
-  amount: number;
-  unit: string;
-  branchId: string;
-  productCategoryId: string;
+    name: string;
+    desc: string;
+    price: number;
+    amount: number;
+    unit: string;
+    branchId: string;
+    productCategoryId: string;
+    kitchenId?: string;
 }
 
 export interface ProductUpdatePayload {
-  name?: string;
-  desc?: string;
-  price?: number;
-  productCategoryId?: string;
+    name?: string;
+    desc?: string;
+    price?: number;
+    productCategoryId?: string;
+    kitchenId?: string;
 }
 
 export const productService = {
-  getByBranch: (branchId: string) =>
-    api.get(`/product/all/manager/${branchId}`),
+    getByBranch: (branchId: string) =>
+        api.get(`/product/all/manager/${branchId}`),
 
-  getAll: () => api.get("/product/all"),
+    getAll: () => api.get("/product/all"),
 
-  create: (data: ProductPayload) => api.post("/product", data),
+    create: (data: ProductPayload) => api.post("/product", data),
 
-  update: (id: string, data: ProductUpdatePayload) =>
-    api.put(`/product/${id}`, data),
+    update: (id: string, data: ProductUpdatePayload) =>
+        api.patch(`/product/${id}`, data),
 
-  toggleStatus: (id: string) => api.patch(`/product/status/${id}`),
+    toggleStatus: (id: string) => api.patch(`/product/status/${id}`),
 
-  delete: (id: string) => api.delete(`/product/${id}`),
+    delete: (id: string) => api.delete(`/product/${id}`),
 };
