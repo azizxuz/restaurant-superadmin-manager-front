@@ -6,7 +6,7 @@ export type UserRole =
   | "AFITSANT"
   | "CHEF"
   | "KASSA"
-  | "SUPER_AFITSANT"; // ✅ Type'da mavjud
+  | "SUPER_AFITSANT";
 
 export interface Company {
   id: string;
@@ -429,129 +429,6 @@ export const rooms: Room[] = Array.from({ length: 20 }, (_, i) => ({
   branchId: "b1",
 }));
 
-export const orders: Order[] = [
-  {
-    id: "o1",
-    userId: "u4",
-    roomId: "r1",
-    branchId: "b1",
-    status: "SUCCESS",
-    createdAt: "2026-02-13T10:30:00Z",
-    endAt: "2026-02-13T11:15:00Z",
-  },
-  {
-    id: "o2",
-    userId: "u4",
-    roomId: "r3",
-    branchId: "b1",
-    status: "SUCCESS",
-    createdAt: "2026-02-13T11:00:00Z",
-    endAt: "2026-02-13T12:00:00Z",
-  },
-  {
-    id: "o3",
-    userId: "u5",
-    roomId: "r5",
-    branchId: "b1",
-    status: "PENDING",
-    createdAt: "2026-02-13T12:30:00Z",
-    endAt: "2026-02-13T13:30:00Z",
-  },
-  {
-    id: "o4",
-    userId: "u5",
-    roomId: "r2",
-    branchId: "b1",
-    status: "SUCCESS",
-    createdAt: "2026-02-12T14:00:00Z",
-    endAt: "2026-02-12T15:00:00Z",
-  },
-  {
-    id: "o5",
-    userId: "u4",
-    roomId: "r7",
-    branchId: "b1",
-    status: "CANCELED",
-    createdAt: "2026-02-12T16:00:00Z",
-    endAt: "2026-02-12T16:30:00Z",
-  },
-  {
-    id: "o6",
-    userId: "u5",
-    roomId: "r10",
-    branchId: "b1",
-    status: "SUCCESS",
-    createdAt: "2026-02-11T12:00:00Z",
-    endAt: "2026-02-11T13:00:00Z",
-  },
-  {
-    id: "o7",
-    userId: "u4",
-    roomId: "r4",
-    branchId: "b1",
-    status: "SUCCESS",
-    createdAt: "2026-02-11T18:00:00Z",
-    endAt: "2026-02-11T19:30:00Z",
-  },
-  {
-    id: "o8",
-    userId: "u5",
-    roomId: "r8",
-    branchId: "b1",
-    status: "SUCCESS",
-    createdAt: "2026-02-10T11:00:00Z",
-    endAt: "2026-02-10T12:30:00Z",
-  },
-  {
-    id: "o9",
-    userId: "u4",
-    roomId: "r12",
-    branchId: "b1",
-    status: "PENDING",
-    createdAt: "2026-02-13T13:00:00Z",
-    endAt: "2026-02-13T14:00:00Z",
-  },
-  {
-    id: "o10",
-    userId: "u5",
-    roomId: "r15",
-    branchId: "b1",
-    status: "SUCCESS",
-    createdAt: "2026-02-09T19:00:00Z",
-    endAt: "2026-02-09T20:30:00Z",
-  },
-];
-
-export const orderItems: OrderItem[] = [
-  { id: "oi1", orderId: "o1", productId: "p4", branchId: "b1", count: 2 },
-  { id: "oi2", orderId: "o1", productId: "p2", branchId: "b1", count: 1 },
-  { id: "oi3", orderId: "o1", productId: "p11", branchId: "b1", count: 1 },
-  { id: "oi4", orderId: "o2", productId: "p7", branchId: "b1", count: 3 },
-  { id: "oi5", orderId: "o2", productId: "p8", branchId: "b1", count: 2 },
-  { id: "oi6", orderId: "o3", productId: "p5", branchId: "b1", count: 4 },
-  { id: "oi7", orderId: "o3", productId: "p10", branchId: "b1", count: 4 },
-  { id: "oi8", orderId: "o4", productId: "p4", branchId: "b1", count: 1 },
-  { id: "oi9", orderId: "o4", productId: "p13", branchId: "b1", count: 2 },
-  { id: "oi10", orderId: "o5", productId: "p3", branchId: "b1", count: 2 },
-  { id: "oi11", orderId: "o6", productId: "p4", branchId: "b1", count: 3 },
-  { id: "oi12", orderId: "o6", productId: "p14", branchId: "b1", count: 5 },
-  { id: "oi13", orderId: "o7", productId: "p7", branchId: "b1", count: 2 },
-  { id: "oi14", orderId: "o8", productId: "p1", branchId: "b1", count: 1 },
-  { id: "oi15", orderId: "o8", productId: "p9", branchId: "b1", count: 1 },
-  { id: "oi16", orderId: "o9", productId: "p6", branchId: "b1", count: 3 },
-  { id: "oi17", orderId: "o10", productId: "p4", branchId: "b1", count: 2 },
-  { id: "oi18", orderId: "o10", productId: "p12", branchId: "b1", count: 2 },
-];
-
-// Helper to calculate order total
-export function getOrderTotal(orderId: string): number {
-  return orderItems
-    .filter((oi) => oi.orderId === orderId)
-    .reduce((sum, oi) => {
-      const product = products.find((p) => p.id === oi.productId);
-      return sum + (product?.price ?? 0) * oi.count;
-    }, 0);
-}
 
 // Generate revenue data for charts
 export function generateRevenueData(
