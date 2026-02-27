@@ -8,6 +8,7 @@ import {
   LogOut, LayoutDashboard, Building2, Users, User,
   GitBranch, ShoppingCart, Package, Menu, X, Settings,
   HomeIcon, ChefHat, Wallet,
+  Receipt,
 } from 'lucide-react';
 
 interface NavItem {
@@ -33,6 +34,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Buyurtmalar", path: "/manager/orders", icon: ShoppingCart },
     { label: "Xonalar va zal", path: "/manager/rooms", icon: HomeIcon },
     { label: "Moliya", path: "/manager/finance", icon: Wallet },
+    { label: "Xarajatlar", path: "/manager/expenses", icon: Receipt },
     { label: "Profil", path: "/manager/profile", icon: User },
     { label: "Sozlamalar", path: "/manager/settings", icon: Settings },
   ],
