@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -13,10 +12,6 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,7 +19,7 @@ import { branchService } from "@/services/branchService";
 import api from "@/lib/api";
 import { formatPrice } from "@/lib/mock-data";
 import {
-    Loader2, Plus, Trash2, Search, GitBranch, Tag, Layers,
+    Loader2, Plus, Search, GitBranch, Tag, Layers,
     ChevronLeft, ChevronRight, Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -74,9 +69,6 @@ const catService = {
         api.post<CostCategory>("/cost-category", data),
     update: (id: string, name: string) =>
         api.patch<CostCategory>(`/cost-category/${id}`, { name }),
-    delete: (id: string) => api.delete<CostCategory>(`/cost-category/${id}`),
-    deleteMany: (branchId: string, ids: string[]) =>
-        api.post<{ count: number }>(`/cost-category/delete-many/${branchId}`, { ids }),
 };
 
 const costService = {
@@ -92,9 +84,6 @@ const costService = {
         name: string; desc: string; quantity: number;
         costAmount: string; costsCategoryId: string;
     }>) => api.patch<Cost>(`/cost/${id}`, data),
-    delete: (id: string) => api.delete<Cost>(`/cost/${id}`),
-    deleteMany: (branchId: string, ids: string[]) =>
-        api.post<{ count: number }>(`/cost/delete-many/${branchId}`, { ids }),
 };
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -105,12 +94,9 @@ export default function Xarajatlar() {
 
     // ── Category state
     const [catSearch, setCatSearch] = useState("");
-    const [catSelected, setCatSelected] = useState<Set<string>>(new Set());
     const [catDialog, setCatDialog] = useState(false);
     const [catEdit, setCatEdit] = useState<CostCategory | null>(null);
     const [catName, setCatName] = useState("");
-    const [catDeleteId, setCatDeleteId] = useState<string | null>(null);
-    const [catDeleteMany, setCatDeleteMany] = useState(false);
 
     // ── Cost filters
     const [costSearch, setCostSearch] = useState("");
@@ -121,11 +107,8 @@ export default function Xarajatlar() {
     const [page, setPage] = useState(1);
 
     // ── Cost CRUD state
-    const [costSelected, setCostSelected] = useState<Set<string>>(new Set());
     const [costDialog, setCostDialog] = useState(false);
     const [costEdit, setCostEdit] = useState<Cost | null>(null);
-    const [costDeleteId, setCostDeleteId] = useState<string | null>(null);
-    const [costDeleteMany, setCostDeleteMany] = useState(false);
     const [costForm, setCostForm] = useState({
         name: "", desc: "", quantity: "1", costAmount: "", costsCategoryId: "",
     });
@@ -162,7 +145,7 @@ export default function Xarajatlar() {
     });
     const categories: CostCategory[] = catRes?.data ?? [];
 
-    // ── Cost query — full params
+    // ── Cost query
     const isCustom = timeFilter === "custom";
     const canFetch = !!selectedBranchId && (!isCustom || (!!fromDate && !!toDate));
 
@@ -190,9 +173,7 @@ export default function Xarajatlar() {
     const totalCount: number = costRes?.total ?? costs.length;
     const totalPages = Math.max(1, Math.ceil(totalCount / LIMIT));
 
-    // ════════════════════════════════════════════════════════════════════════════
-    // CATEGORY MUTATIONS
-    // ════════════════════════════════════════════════════════════════════════════
+    // ── Category mutations
     const catCreateMut = useMutation({
         mutationFn: (name: string) => catService.create({ name, branchId: selectedBranchId }),
         onSuccess: (res) => {
@@ -219,36 +200,7 @@ export default function Xarajatlar() {
         onError: () => toast.error("Xatolik yuz berdi"),
     });
 
-    const catDeleteMut = useMutation({
-        mutationFn: (id: string) => catService.delete(id),
-        onSuccess: (_, id) => {
-            queryClient.setQueryData(catQK, (old: CostCategoryResponse | undefined) => ({
-                totalCost: old?.totalCost ?? 0,
-                data: (old?.data ?? []).filter((c) => c.id !== id),
-            }));
-            toast.success("Kategoriya o'chirildi");
-            setCatDeleteId(null);
-        },
-        onError: () => toast.error("Xatolik yuz berdi"),
-    });
-
-    const catDeleteManyMut = useMutation({
-        mutationFn: () => catService.deleteMany(selectedBranchId, Array.from(catSelected)),
-        onSuccess: () => {
-            queryClient.setQueryData(catQK, (old: CostCategoryResponse | undefined) => ({
-                totalCost: old?.totalCost ?? 0,
-                data: (old?.data ?? []).filter((c) => !catSelected.has(c.id)),
-            }));
-            toast.success(`${catSelected.size} ta kategoriya o'chirildi`);
-            setCatSelected(new Set());
-            setCatDeleteMany(false);
-        },
-        onError: () => toast.error("Xatolik yuz berdi"),
-    });
-
-    // ════════════════════════════════════════════════════════════════════════════
-    // COST MUTATIONS
-    // ════════════════════════════════════════════════════════════════════════════
+    // ── Cost mutations
     const costCreateMut = useMutation({
         mutationFn: () => costService.create({
             name: costForm.name, desc: costForm.desc,
@@ -284,39 +236,6 @@ export default function Xarajatlar() {
         onError: () => toast.error("Xatolik yuz berdi"),
     });
 
-    const costDeleteMut = useMutation({
-        mutationFn: (id: string) => costService.delete(id),
-        onSuccess: (res, id) => {
-            queryClient.setQueryData(costQK, (old: CostResponse | undefined) => ({
-                totalExpense: Math.max(0, (old?.totalExpense ?? 0) - Number(res.data.costAmount)),
-                total: Math.max(0, (old?.total ?? 1) - 1),
-                data: (old?.data ?? []).filter((c) => c.id !== id),
-            }));
-            toast.success("Xarajat o'chirildi");
-            setCostDeleteId(null);
-        },
-        onError: () => toast.error("Xatolik yuz berdi"),
-    });
-
-    const costDeleteManyMut = useMutation({
-        mutationFn: () => costService.deleteMany(selectedBranchId, Array.from(costSelected)),
-        onSuccess: () => {
-            queryClient.setQueryData(costQK, (old: CostResponse | undefined) => {
-                const removed = (old?.data ?? []).filter((c) => costSelected.has(c.id));
-                const removedSum = removed.reduce((s, c) => s + Number(c.costAmount), 0);
-                return {
-                    totalExpense: Math.max(0, (old?.totalExpense ?? 0) - removedSum),
-                    total: Math.max(0, (old?.total ?? 0) - costSelected.size),
-                    data: (old?.data ?? []).filter((c) => !costSelected.has(c.id)),
-                };
-            });
-            toast.success(`${costSelected.size} ta xarajat o'chirildi`);
-            setCostSelected(new Set());
-            setCostDeleteMany(false);
-        },
-        onError: () => toast.error("Xatolik yuz berdi"),
-    });
-
     // ── Handlers
     const openAddCat = () => { setCatEdit(null); setCatName(""); setCatDialog(true); };
     const openEditCat = (c: CostCategory) => { setCatEdit(c); setCatName(c.name); setCatDialog(true); };
@@ -342,19 +261,12 @@ export default function Xarajatlar() {
         costEdit ? costUpdateMut.mutate() : costCreateMut.mutate();
     };
 
-    const toggleCat = (id: string) => setCatSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-    const toggleAllCat = () => setCatSelected(catSelected.size === categories.length ? new Set() : new Set(categories.map((c) => c.id)));
-    const toggleCost = (id: string) => setCostSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-    const toggleAllCost = () => setCostSelected(costSelected.size === costs.length ? new Set() : new Set(costs.map((c) => c.id)));
-
     const isCatSaving = catCreateMut.isPending || catUpdateMut.isPending;
     const isCostSaving = costCreateMut.isPending || costUpdateMut.isPending;
 
-    // ─── Render ─────────────────────────────────────────────────────────────────
     return (
         <div className="space-y-6">
-
-            {/* ── Header ──────────────────────────────────────────────────────── */}
+            {/* Header */}
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Xarajatlar</h2>
@@ -364,9 +276,7 @@ export default function Xarajatlar() {
                     <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground hidden sm:inline">Filial:</span>
                     {branchesLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : (
-                        <Select value={selectedBranchId} onValueChange={(v) => {
-                            setSelectedBranchId(v); setCatSelected(new Set()); setCostSelected(new Set());
-                        }}>
+                        <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
                             <SelectTrigger className="w-44 h-9"><SelectValue placeholder="Tanlang" /></SelectTrigger>
                             <SelectContent>
                                 {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
@@ -376,7 +286,6 @@ export default function Xarajatlar() {
                 </div>
             </div>
 
-            {/* ── Tabs ────────────────────────────────────────────────────────── */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
                     <TabsTrigger value="costs" className="gap-1.5">
@@ -391,21 +300,17 @@ export default function Xarajatlar() {
                     </TabsTrigger>
                 </TabsList>
 
-                {/* ══ COSTS ════════════════════════════════════════════════════════ */}
+                {/* ══ COSTS ══════════════════════════════════════════════════════ */}
                 <TabsContent value="costs" className="mt-4">
                     <Card>
-                        {/* ── Filter bar ─────────────────────────────────────────── */}
                         <div className="p-4 border-b border-border space-y-3">
-                            {/* Row 1: search + time filter + category filter */}
                             <div className="flex flex-wrap items-center gap-2">
-                                {/* Search */}
                                 <div className="relative w-52">
                                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                                     <Input placeholder="Qidirish..." value={costSearch}
                                         onChange={(e) => setCostSearch(e.target.value)} className="pl-8 h-9" />
                                 </div>
 
-                                {/* Time filter — segment buttons */}
                                 <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
                                     {TIME_OPTIONS.map((opt) => (
                                         <button key={opt.value} onClick={() => setTimeFilter(opt.value)}
@@ -418,7 +323,6 @@ export default function Xarajatlar() {
                                     ))}
                                 </div>
 
-                                {/* Category filter */}
                                 <Select value={catIdFilter} onValueChange={setCatIdFilter}>
                                     <SelectTrigger className="w-44 h-9">
                                         <SelectValue placeholder="Barcha kategoriya" />
@@ -431,17 +335,9 @@ export default function Xarajatlar() {
                                     </SelectContent>
                                 </Select>
 
-                                {/* Loading */}
                                 {costsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
 
-                                {/* Delete many + Add */}
-                                <div className="ml-auto flex items-center gap-2">
-                                    {costSelected.size > 0 && (
-                                        <Button variant="destructive" size="sm" onClick={() => setCostDeleteMany(true)} className="gap-1.5">
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                            {costSelected.size} ta o'chirish
-                                        </Button>
-                                    )}
+                                <div className="ml-auto">
                                     <Button size="sm" onClick={openAddCost} className="gap-1.5" disabled={categories.length === 0}>
                                         <Plus className="h-4 w-4" />
                                         Xarajat qo'shish
@@ -449,7 +345,6 @@ export default function Xarajatlar() {
                                 </div>
                             </div>
 
-                            {/* Row 2: custom date range */}
                             {timeFilter === "custom" && (
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -463,21 +358,15 @@ export default function Xarajatlar() {
                             )}
                         </div>
 
-                        {/* Warning: no categories */}
                         {categories.length === 0 && !catsLoading && (
                             <div className="text-center py-2.5 text-sm text-amber-700 bg-amber-50 border-b border-amber-200 px-4">
                                 ⚠️ Xarajat qo'shish uchun avval kategoriya yarating
                             </div>
                         )}
 
-                        {/* ── Table ───────────────────────────────────────────────── */}
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-10">
-                                        <Checkbox checked={costs.length > 0 && costSelected.size === costs.length}
-                                            onCheckedChange={toggleAllCost} disabled={costs.length === 0} />
-                                    </TableHead>
                                     <TableHead>Nomi</TableHead>
                                     <TableHead>Tavsif</TableHead>
                                     <TableHead>Kategoriya</TableHead>
@@ -489,25 +378,22 @@ export default function Xarajatlar() {
                             </TableHeader>
                             <TableBody>
                                 {costsLoading ? (
-                                    <TableRow><TableCell colSpan={8} className="text-center py-12">
+                                    <TableRow><TableCell colSpan={7} className="text-center py-12">
                                         <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
                                     </TableCell></TableRow>
                                 ) : isCustom && (!fromDate || !toDate) ? (
-                                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">
+                                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-12">
                                         Sana oralig'ini tanlang
                                     </TableCell></TableRow>
                                 ) : !selectedBranchId ? (
-                                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Filial tanlang</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-12">Filial tanlang</TableCell></TableRow>
                                 ) : costs.length === 0 ? (
-                                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">
+                                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-12">
                                         Xarajatlar topilmadi
                                     </TableCell></TableRow>
                                 ) : (
                                     costs.map((c) => (
-                                        <TableRow key={c.id} className={costSelected.has(c.id) ? "bg-muted/40" : ""}>
-                                            <TableCell>
-                                                <Checkbox checked={costSelected.has(c.id)} onCheckedChange={() => toggleCost(c.id)} />
-                                            </TableCell>
+                                        <TableRow key={c.id}>
                                             <TableCell className="font-medium">{c.name}</TableCell>
                                             <TableCell className="text-muted-foreground text-sm max-w-[160px] truncate">{c.desc || "—"}</TableCell>
                                             <TableCell>
@@ -520,10 +406,8 @@ export default function Xarajatlar() {
                                             <TableCell className="text-muted-foreground text-sm">
                                                 {new Date(c.createdAt).toLocaleDateString("uz-UZ")}
                                             </TableCell>
-                                            <TableCell className="text-right space-x-1">
+                                            <TableCell className="text-right">
                                                 <Button variant="ghost" size="sm" onClick={() => openEditCost(c)}>Tahrirlash</Button>
-                                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"
-                                                    onClick={() => setCostDeleteId(c.id)}>O'chirish</Button>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -531,9 +415,7 @@ export default function Xarajatlar() {
                             </TableBody>
                         </Table>
 
-                        {/* ── Footer: total + pagination ───────────────────────────── */}
                         <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-                            {/* Total */}
                             <div className="text-sm text-muted-foreground">
                                 {totalCount > 0 && (
                                     <>
@@ -547,7 +429,6 @@ export default function Xarajatlar() {
                                 )}
                             </div>
 
-                            {/* Pagination */}
                             {totalPages > 1 && (
                                 <div className="flex items-center gap-1">
                                     <Button variant="outline" size="icon" className="h-8 w-8"
@@ -563,7 +444,7 @@ export default function Xarajatlar() {
                                         }, [])
                                         .map((p, i) =>
                                             p === "..." ? (
-                                                <span key={`ellipsis-${i}`} className="px-1 text-muted-foreground text-sm">…</span>
+                                                <span key={`e-${i}`} className="px-1 text-muted-foreground text-sm">…</span>
                                             ) : (
                                                 <Button key={p} variant={page === p ? "default" : "outline"}
                                                     size="icon" className="h-8 w-8 text-sm"
@@ -582,7 +463,7 @@ export default function Xarajatlar() {
                     </Card>
                 </TabsContent>
 
-                {/* ══ CATEGORIES ═══════════════════════════════════════════════════ */}
+                {/* ══ CATEGORIES ══════════════════════════════════════════════════ */}
                 <TabsContent value="categories" className="mt-4">
                     <Card>
                         <div className="flex items-center gap-3 p-4 border-b border-border flex-wrap">
@@ -591,11 +472,6 @@ export default function Xarajatlar() {
                                 <Input placeholder="Kategoriya qidirish..." value={catSearch}
                                     onChange={(e) => setCatSearch(e.target.value)} className="pl-8 h-9" />
                             </div>
-                            {catSelected.size > 0 && (
-                                <Button variant="destructive" size="sm" onClick={() => setCatDeleteMany(true)} className="gap-1.5">
-                                    <Trash2 className="h-3.5 w-3.5" />{catSelected.size} ta o'chirish
-                                </Button>
-                            )}
                             <Button size="sm" onClick={openAddCat} className="ml-auto gap-1.5">
                                 <Plus className="h-4 w-4" />Kategoriya qo'shish
                             </Button>
@@ -604,10 +480,6 @@ export default function Xarajatlar() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-10">
-                                        <Checkbox checked={categories.length > 0 && catSelected.size === categories.length}
-                                            onCheckedChange={toggleAllCat} disabled={categories.length === 0} />
-                                    </TableHead>
                                     <TableHead>Nomi</TableHead>
                                     <TableHead>Xarajatlar</TableHead>
                                     <TableHead>Holat</TableHead>
@@ -617,21 +489,18 @@ export default function Xarajatlar() {
                             </TableHeader>
                             <TableBody>
                                 {catsLoading ? (
-                                    <TableRow><TableCell colSpan={6} className="text-center py-12">
+                                    <TableRow><TableCell colSpan={5} className="text-center py-12">
                                         <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
                                     </TableCell></TableRow>
                                 ) : !selectedBranchId ? (
-                                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">Filial tanlang</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">Filial tanlang</TableCell></TableRow>
                                 ) : categories.length === 0 ? (
-                                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">
                                         {catSearch ? "Qidiruv bo'yicha natija topilmadi" : "Kategoriyalar mavjud emas"}
                                     </TableCell></TableRow>
                                 ) : (
                                     categories.map((c) => (
-                                        <TableRow key={c.id} className={catSelected.has(c.id) ? "bg-muted/40" : ""}>
-                                            <TableCell>
-                                                <Checkbox checked={catSelected.has(c.id)} onCheckedChange={() => toggleCat(c.id)} />
-                                            </TableCell>
+                                        <TableRow key={c.id}>
                                             <TableCell className="font-medium">{c.name}</TableCell>
                                             <TableCell>
                                                 <Badge variant="secondary">{Array.isArray(c.cost) ? c.cost.length : 0} ta</Badge>
@@ -644,16 +513,15 @@ export default function Xarajatlar() {
                                             <TableCell className="text-muted-foreground text-sm">
                                                 {new Date(c.createdAt).toLocaleDateString("uz-UZ")}
                                             </TableCell>
-                                            <TableCell className="text-right space-x-1">
+                                            <TableCell className="text-right">
                                                 <Button variant="ghost" size="sm" onClick={() => openEditCat(c)}>Tahrirlash</Button>
-                                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"
-                                                    onClick={() => setCatDeleteId(c.id)}>O'chirish</Button>
                                             </TableCell>
                                         </TableRow>
                                     ))
                                 )}
                             </TableBody>
                         </Table>
+
                         {categories.length > 0 && (
                             <div className="px-4 py-3 border-t border-border text-sm text-muted-foreground">
                                 {categories.length} ta kategoriya
@@ -663,7 +531,7 @@ export default function Xarajatlar() {
                 </TabsContent>
             </Tabs>
 
-            {/* ══ Category Dialog ═══════════════════════════════════════════════ */}
+            {/* ══ Category Dialog ════════════════════════════════════════════════ */}
             <Dialog open={catDialog} onOpenChange={setCatDialog}>
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
@@ -686,7 +554,7 @@ export default function Xarajatlar() {
                 </DialogContent>
             </Dialog>
 
-            {/* ══ Cost Dialog ═══════════════════════════════════════════════════ */}
+            {/* ══ Cost Dialog ════════════════════════════════════════════════════ */}
             <Dialog open={costDialog} onOpenChange={setCostDialog}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
@@ -696,7 +564,7 @@ export default function Xarajatlar() {
                         <div className="space-y-1.5">
                             <Label>Nomi <span className="text-destructive">*</span></Label>
                             <Input placeholder="Masalan: Svet" value={costForm.name}
-                                onChange={(e) => setCostForm({ ...costForm, name: e.target.value })} />
+                                onChange={(e) => setCostForm({ ...costForm, name: e.target.value })} autoFocus />
                         </div>
                         <div className="space-y-1.5">
                             <Label>Tavsif</Label>
@@ -734,79 +602,6 @@ export default function Xarajatlar() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
-            {/* ══ Alert Dialogs ══════════════════════════════════════════════════ */}
-            {/* Cat delete single */}
-            <AlertDialog open={!!catDeleteId} onOpenChange={() => setCatDeleteId(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Kategoriyani o'chirish</AlertDialogTitle>
-                        <AlertDialogDescription>Unga bog'liq xarajatlar ham o'chishi mumkin.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={catDeleteMut.isPending}>Bekor qilish</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => catDeleteId && catDeleteMut.mutate(catDeleteId)}
-                            disabled={catDeleteMut.isPending}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                            {catDeleteMut.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}O'chirish
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Cat delete many */}
-            <AlertDialog open={catDeleteMany} onOpenChange={setCatDeleteMany}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{catSelected.size} ta kategoriyani o'chirish</AlertDialogTitle>
-                        <AlertDialogDescription>Tanlangan <strong>{catSelected.size} ta</strong> kategoriya o'chib ketadi.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={catDeleteManyMut.isPending}>Bekor qilish</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => catDeleteManyMut.mutate()}
-                            disabled={catDeleteManyMut.isPending}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                            {catDeleteManyMut.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}O'chirish
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Cost delete single */}
-            <AlertDialog open={!!costDeleteId} onOpenChange={() => setCostDeleteId(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Xarajatni o'chirish</AlertDialogTitle>
-                        <AlertDialogDescription>Bu xarajat butunlay o'chiriladi.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={costDeleteMut.isPending}>Bekor qilish</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => costDeleteId && costDeleteMut.mutate(costDeleteId)}
-                            disabled={costDeleteMut.isPending}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                            {costDeleteMut.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}O'chirish
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Cost delete many */}
-            <AlertDialog open={costDeleteMany} onOpenChange={setCostDeleteMany}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{costSelected.size} ta xarajatni o'chirish</AlertDialogTitle>
-                        <AlertDialogDescription>Tanlangan <strong>{costSelected.size} ta</strong> xarajat o'chib ketadi.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={costDeleteManyMut.isPending}>Bekor qilish</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => costDeleteManyMut.mutate()}
-                            disabled={costDeleteManyMut.isPending}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                            {costDeleteManyMut.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}O'chirish
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }

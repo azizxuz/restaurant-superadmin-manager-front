@@ -20,8 +20,16 @@ export interface ProductUpdatePayload {
 }
 
 export const productService = {
-    getByBranch: (branchId: string) =>
-        api.get(`/product/all/manager/${branchId}`),
+    getByBranch: (branchId: string, params?: { page?: number; limit?: number; search?: string; categoryId?: string; }) =>
+        api.get(`/product/all/manager/${branchId}`, {
+            params: {
+                page: params?.page ?? 1,
+                limit: params?.limit ?? 10,
+                ...(params?.search ? { search: params.search } : {}),
+                ...(params?.categoryId ? { categoryId: params.categoryId } : {}),
+            },
+        }),
+
 
     getAll: () => api.get("/product/all"),
 

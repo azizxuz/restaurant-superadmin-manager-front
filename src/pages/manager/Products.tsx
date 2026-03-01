@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,10 +53,33 @@ import {
     MapPin,
     Star,
     Trash2,
+    Search,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
+    SlidersHorizontal,
+    X,
+    ImagePlus,
+    Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
-// ─── Popular Product Service (inline) ────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+const UNIT_OPTIONS = [
+    { value: "DONA", label: "Dona" },
+    { value: "PORSIYA", label: "Porsiya" },
+    { value: "KG", label: "Kg" },
+    { value: "GRAM", label: "Gram" },
+    { value: "LITR", label: "Litr" },
+    { value: "ML", label: "Ml" },
+    { value: "QUTI", label: "Quti" },
+    { value: "BLOK", label: "Blok" },
+    { value: "PACHKA", label: "Pachka" },
+    { value: "TOVA", label: "Tova" },
+];
+
+// ─── Popular Product Service ──────────────────────────────────────────────────
 const popularProductService = {
     getByBranch: (branchId: string) =>
         api.get(`/popular-products/all/manager/${branchId}`),
@@ -72,6 +95,7 @@ interface ProductCategory {
     id: string;
     name: string;
     branchId: string;
+    icon?: string | null;
     status: StatusType;
 }
 
@@ -82,6 +106,7 @@ interface Product {
     price: number;
     amount: number;
     unit: string;
+    photo?: string | null;
     branchId: string;
     productCategoryId: string;
     kitchenId?: string | null;
@@ -102,7 +127,7 @@ interface PopularProduct {
     createdAt?: string;
 }
 
-// API har xil struktura qaytarishi mumkin — doim arrayga normallash
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function toArray<T>(raw: unknown): T[] {
     if (Array.isArray(raw)) return raw as T[];
     if (raw && typeof raw === "object") {
@@ -114,14 +139,208 @@ function toArray<T>(raw: unknown): T[] {
     return [];
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+function toPaginated<T>(raw: unknown): { items: T[]; total: number; totalPages: number } {
+    if (!raw || typeof raw !== "object") return { items: [], total: 0, totalPages: 1 };
+    const obj = raw as Record<string, unknown>;
+
+    // Server { data: [...], total: 31, page: 1, limit: 10 } strukturasi
+    const items = toArray<T>(raw);
+    const total = Number(obj.total ?? obj.totalCount ?? obj.count ?? items.length) || items.length;
+
+    // totalPages: serverdan kelsa ishlatamiz, yo'q bo'lsa limit bilan hisoblaymiz
+    let totalPages = Number(obj.totalPages ?? obj.pages ?? obj.pageCount ?? 0);
+    if (!totalPages && total > 0) {
+        const limit = Number(obj.limit ?? obj.pageSize ?? 10);
+        totalPages = Math.ceil(total / (limit || 10));
+    }
+    totalPages = Math.max(totalPages, 1);
+
+    return { items, total, totalPages };
+}
+
+function useDebounce<T>(value: T, delay: number): T {
+    const [debounced, setDebounced] = useState(value);
+    useEffect(() => {
+        const t = setTimeout(() => setDebounced(value), delay);
+        return () => clearTimeout(t);
+    }, [value, delay]);
+    return debounced;
+}
+
+// ─── ImageUpload Component ────────────────────────────────────────────────────
+interface ImageUploadProps {
+    value: File | null;
+    onChange: (file: File | null) => void;
+    label?: string;
+    hint?: string;
+    existingUrl?: string | null;
+}
+
+function ImageUpload({ value, onChange, label = "Rasm", hint, existingUrl }: ImageUploadProps) {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const preview = value ? URL.createObjectURL(value) : existingUrl || null;
+
+    return (
+        <div className="space-y-1.5">
+            <Label>
+                {label}{" "}
+                <span className="text-muted-foreground text-xs">(ixtiyoriy)</span>
+            </Label>
+            <div
+                onClick={() => inputRef.current?.click()}
+                className={`relative flex items-center gap-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors px-3 py-2.5
+                    ${preview
+                        ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
+                        : "border-border hover:border-primary/50 hover:bg-muted/40"
+                    }`}
+            >
+                {preview ? (
+                    <>
+                        <img
+                            src={preview}
+                            alt="preview"
+                            className="h-12 w-12 rounded-md object-cover shrink-0 border border-border"
+                        />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate text-foreground">
+                                {value ? value.name : "Mavjud rasm"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                {value ? `${(value.size / 1024).toFixed(0)} KB` : "O'zgartirish uchun bosing"}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onChange(null); }}
+                            className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex items-center justify-center h-12 w-12 rounded-md bg-muted shrink-0">
+                            <ImagePlus className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div>
+                            <p className="text-sm text-muted-foreground">Rasm yuklash uchun bosing</p>
+                            {hint && <p className="text-xs text-muted-foreground/70">{hint}</p>}
+                        </div>
+                    </>
+                )}
+            </div>
+            <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => onChange(e.target.files?.[0] || null)}
+            />
+        </div>
+    );
+}
+
+// ─── Pagination Component ─────────────────────────────────────────────────────
+interface PaginationProps {
+    page: number;
+    totalPages: number;
+    total: number;
+    limit: number;
+    onPageChange: (page: number) => void;
+    onLimitChange: (limit: number) => void;
+    isLoading?: boolean;
+}
+
+function Pagination({ page, totalPages, total, limit, onPageChange, onLimitChange, isLoading }: PaginationProps) {
+    const startItem = total === 0 ? 0 : (page - 1) * limit + 1;
+    const endItem = Math.min(page * limit, total);
+
+    const getPageNumbers = (): (number | "...")[] => {
+        if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+        const pages: (number | "...")[] = [1];
+        if (page > 3) pages.push("...");
+        for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
+        if (page < totalPages - 2) pages.push("...");
+        pages.push(totalPages);
+        return pages;
+    };
+
+    return (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border/60 bg-muted/20">
+            <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">
+                    {isLoading ? (
+                        <span className="inline-flex items-center gap-1.5">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Yuklanmoqda...
+                        </span>
+                    ) : (
+                        <>
+                            <span className="font-semibold text-foreground">{startItem}–{endItem}</span>
+                            {" "}/ jami{" "}
+                            <span className="font-semibold text-foreground">{total}</span>
+                        </>
+                    )}
+                </span>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">Ko'rsatish:</span>
+                    <Select value={String(limit)} onValueChange={(v) => { onLimitChange(Number(v)); onPageChange(1); }}>
+                        <SelectTrigger className="h-7 w-16 text-xs border-border/60 bg-background">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {[5, 10, 20, 50].map((n) => (
+                                <SelectItem key={n} value={String(n)} className="text-xs">{n} ta</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="h-7 w-7 border-border/60"
+                    onClick={() => onPageChange(1)} disabled={page === 1 || isLoading}>
+                    <ChevronsLeft className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-7 w-7 border-border/60"
+                    onClick={() => onPageChange(page - 1)} disabled={page === 1 || isLoading}>
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                {getPageNumbers().map((p, i) =>
+                    p === "..." ? (
+                        <span key={`e${i}`} className="px-1 text-xs text-muted-foreground">···</span>
+                    ) : (
+                        <Button key={p} variant={p === page ? "default" : "outline"} size="icon"
+                            className={`h-7 w-7 text-xs border-border/60 ${p === page ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-accent"}`}
+                            onClick={() => onPageChange(p as number)} disabled={isLoading}>
+                            {p}
+                        </Button>
+                    )
+                )}
+                <Button variant="outline" size="icon" className="h-7 w-7 border-border/60"
+                    onClick={() => onPageChange(page + 1)} disabled={page === totalPages || isLoading || totalPages === 0}>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-7 w-7 border-border/60"
+                    onClick={() => onPageChange(totalPages)} disabled={page === totalPages || isLoading || totalPages === 0}>
+                    <ChevronsRight className="h-3.5 w-3.5" />
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function ManagerProducts() {
     const queryClient = useQueryClient();
 
     const [selectedBranchId, setSelectedBranchId] = useState<string>("");
     const [activeTab, setActiveTab] = useState("products");
+
+    // Products filter & pagination
     const [search, setSearch] = useState("");
     const [catFilter, setCatFilter] = useState("ALL");
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(10);
+    const debouncedSearch = useDebounce(search, 400);
 
     // Product dialog
     const [prodDialog, setProdDialog] = useState(false);
@@ -130,18 +349,22 @@ export default function ManagerProducts() {
         name: "",
         desc: "",
         price: "",
+        amount: "0",
+        unit: "DONA",
         productCategoryId: "",
         kitchenId: "",
     });
+    const [prodPhoto, setProdPhoto] = useState<File | null>(null);
     const [deleteProdId, setDeleteProdId] = useState<string | null>(null);
 
     // Category dialog
     const [catDialog, setCatDialog] = useState(false);
     const [editCat, setEditCat] = useState<ProductCategory | null>(null);
     const [catName, setCatName] = useState("");
+    const [catIcon, setCatIcon] = useState<File | null>(null);
     const [deleteCatId, setDeleteCatId] = useState<string | null>(null);
 
-    // Popular products dialog
+    // Popular products
     const [popularDialog, setPopularDialog] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState("");
     const [deletePopularId, setDeletePopularId] = useState<string | null>(null);
@@ -155,44 +378,48 @@ export default function ManagerProducts() {
     const branches = toArray<BranchResponse>(branchesRaw);
 
     useEffect(() => {
-        if (branches.length > 0 && !selectedBranchId) {
-            setSelectedBranchId(branches[0].id);
-        }
+        if (branches.length > 0 && !selectedBranchId) setSelectedBranchId(branches[0].id);
     }, [branches, selectedBranchId]);
 
     useEffect(() => {
-        if (selectedBranchId) {
-            setCatFilter("ALL");
-            setSearch("");
-        }
+        if (selectedBranchId) { setCatFilter("ALL"); setSearch(""); setPage(1); }
     }, [selectedBranchId]);
 
+    useEffect(() => { setPage(1); }, [debouncedSearch, catFilter]);
+
     // ─── Categories ───────────────────────────────────────────────────────────
-    const {
-        data: catsRaw,
-        isLoading: catsLoading,
-        refetch: refetchCats,
-    } = useQuery({
+    const { data: catsRaw, isLoading: catsLoading, refetch: refetchCats } = useQuery({
         queryKey: ["categories", selectedBranchId],
-        queryFn: () =>
-            categoryService.getByBranch(selectedBranchId).then((r) => r.data),
+        queryFn: () => categoryService.getByBranch(selectedBranchId).then((r) => r.data),
         enabled: !!selectedBranchId,
     });
     const categories = toArray<ProductCategory>(catsRaw);
     const activeCats = categories.filter((c) => c.status === "ACTIVE");
 
-    // ─── Products ─────────────────────────────────────────────────────────────
-    const {
-        data: prodsRaw,
-        isLoading: prodsLoading,
-        refetch: refetchProds,
-    } = useQuery({
-        queryKey: ["products", selectedBranchId],
+    // ─── Products (paginated) ─────────────────────────────────────────────────
+    const { data: prodsRaw, isLoading: prodsLoading, isFetching: prodsFetching, refetch: refetchProds } = useQuery({
+        queryKey: ["products", selectedBranchId, page, limit, debouncedSearch, catFilter],
         queryFn: () =>
-            productService.getByBranch(selectedBranchId).then((r) => r.data),
+            productService.getByBranch(selectedBranchId, {
+                page,
+                limit,
+                search: debouncedSearch || undefined,
+                categoryId: catFilter !== "ALL" ? catFilter : undefined,
+            }).then((r) => r.data),
         enabled: !!selectedBranchId,
+        placeholderData: (prev) => prev,
     });
-    const productsList = toArray<Product>(prodsRaw);
+    const { items: productsList, total: prodsTotal, totalPages: prodsTotalPages } = toPaginated<Product>(prodsRaw);
+
+    // All products (for popular tab + stats)
+    const { data: allProdsRaw } = useQuery({
+        queryKey: ["products-all", selectedBranchId],
+        queryFn: () =>
+            productService.getByBranch(selectedBranchId, { page: 1, limit: 1000 }).then((r) => r.data),
+        enabled: !!selectedBranchId,
+        staleTime: 2 * 60 * 1000,
+    });
+    const allProducts = toArray<Product>(allProdsRaw);
 
     // ─── Kitchens ─────────────────────────────────────────────────────────────
     const { data: kitchensRaw } = useQuery({
@@ -204,51 +431,139 @@ export default function ManagerProducts() {
         },
         enabled: !!selectedBranchId,
     });
-    const kitchensList = toArray<Kitchen>(kitchensRaw);
-    const activeKitchens = kitchensList.filter((k) => k.status === "ACTIVE");
+    const activeKitchens = toArray<Kitchen>(kitchensRaw).filter((k) => k.status === "ACTIVE");
 
     // ─── Popular Products ─────────────────────────────────────────────────────
-    const {
-        data: popularRaw,
-        isLoading: popularLoading,
-        refetch: refetchPopular,
-    } = useQuery({
+    const { data: popularRaw, isLoading: popularLoading, refetch: refetchPopular } = useQuery({
         queryKey: ["popular-products", selectedBranchId],
-        queryFn: () =>
-            popularProductService.getByBranch(selectedBranchId).then((r) => r.data),
+        queryFn: () => popularProductService.getByBranch(selectedBranchId).then((r) => r.data),
         enabled: !!selectedBranchId,
     });
     const popularList = toArray<PopularProduct>(popularRaw);
-
     const selectedBranch = branches.find((b) => b.id === selectedBranchId);
+
+    // ─── Cache helpers ────────────────────────────────────────────────────────
+    const getArrayKey = (obj: Record<string, unknown>) =>
+        ["data", "items", "result", "results", "content"].find(k => Array.isArray(obj[k]));
+
+    const updateProductInCache = (updated: Product) => {
+        const mapper = (old: unknown) => {
+            if (!old) return old;
+            if (Array.isArray(old)) return (old as Product[]).map(p => p.id === updated.id ? updated : p);
+            const obj = old as Record<string, unknown>;
+            const key = getArrayKey(obj);
+            if (key) return { ...obj, [key]: (obj[key] as Product[]).map(p => p.id === updated.id ? updated : p) };
+            return old;
+        };
+        queryClient.setQueriesData({ queryKey: ["products", selectedBranchId], exact: false }, mapper);
+        queryClient.setQueryData(["products-all", selectedBranchId], mapper);
+    };
+
+    const addProductToCache = (created: Product) => {
+        queryClient.setQueryData<unknown>(["products-all", selectedBranchId], (old: unknown) => {
+            if (Array.isArray(old)) return [created, ...old];
+            return old;
+        });
+        queryClient.invalidateQueries({ queryKey: ["products", selectedBranchId], exact: false });
+    };
+
+    const removeProductFromCache = (id: string) => {
+        const mapper = (old: unknown) => {
+            if (!old) return old;
+            if (Array.isArray(old)) return (old as Product[]).filter(p => p.id !== id);
+            const obj = old as Record<string, unknown>;
+            const key = getArrayKey(obj);
+            if (key) {
+                const filtered = (obj[key] as Product[]).filter(p => p.id !== id);
+                return { ...obj, [key]: filtered, total: typeof obj.total === "number" ? obj.total - 1 : obj.total };
+            }
+            return old;
+        };
+        queryClient.setQueriesData({ queryKey: ["products", selectedBranchId], exact: false }, mapper);
+        queryClient.setQueryData(["products-all", selectedBranchId], mapper);
+    };
+
+    const updateCategoryInCache = (updated: ProductCategory) => {
+        queryClient.setQueryData<unknown>(["categories", selectedBranchId], (old: unknown) => {
+            if (Array.isArray(old)) return old.map((c: ProductCategory) => c.id === updated.id ? updated : c);
+            if (old && typeof old === "object") {
+                const obj = old as Record<string, unknown>;
+                const key = getArrayKey(obj);
+                if (key) return { ...obj, [key]: (obj[key] as ProductCategory[]).map(c => c.id === updated.id ? updated : c) };
+            }
+            return old;
+        });
+    };
+
+    const addCategoryToCache = (created: ProductCategory) => {
+        queryClient.setQueryData<unknown>(["categories", selectedBranchId], (old: unknown) => {
+            if (Array.isArray(old)) return [...old, created];
+            if (old && typeof old === "object") {
+                const obj = old as Record<string, unknown>;
+                const key = getArrayKey(obj);
+                if (key) return { ...obj, [key]: [...(obj[key] as ProductCategory[]), created] };
+            }
+            return old;
+        });
+    };
+
+    const removeCategoryFromCache = (id: string) => {
+        queryClient.setQueryData<unknown>(["categories", selectedBranchId], (old: unknown) => {
+            if (Array.isArray(old)) return (old as ProductCategory[]).filter(c => c.id !== id);
+            if (old && typeof old === "object") {
+                const obj = old as Record<string, unknown>;
+                const key = getArrayKey(obj);
+                if (key) return { ...obj, [key]: (obj[key] as ProductCategory[]).filter(c => c.id !== id) };
+            }
+            return old;
+        });
+    };
+
+    const addPopularToCache = (created: PopularProduct) => {
+        queryClient.setQueryData<unknown>(["popular-products", selectedBranchId], (old: unknown) => {
+            if (Array.isArray(old)) return [...old, created];
+            if (old && typeof old === "object") {
+                const obj = old as Record<string, unknown>;
+                const key = getArrayKey(obj);
+                if (key) return { ...obj, [key]: [...(obj[key] as PopularProduct[]), created] };
+            }
+            return old;
+        });
+    };
+
+    const removePopularFromCache = (id: string) => {
+        queryClient.setQueryData<unknown>(["popular-products", selectedBranchId], (old: unknown) => {
+            if (Array.isArray(old)) return (old as PopularProduct[]).filter(p => p.id !== id);
+            if (old && typeof old === "object") {
+                const obj = old as Record<string, unknown>;
+                const key = getArrayKey(obj);
+                if (key) return { ...obj, [key]: (obj[key] as PopularProduct[]).filter(p => p.id !== id) };
+            }
+            return old;
+        });
+    };
 
     // ─── Product mutations ────────────────────────────────────────────────────
     const createProductMutation = useMutation({
-        mutationFn: (data: Parameters<typeof productService.create>[0]) =>
-            productService.create(data),
-        onSuccess: () => {
+        mutationFn: (formData: FormData) =>
+            api.post("/product", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+        onSuccess: (res) => {
             toast.success("Mahsulot yaratildi");
-            queryClient.invalidateQueries({
-                queryKey: ["products", selectedBranchId],
-            });
+            const created: Product = res?.data?.data ?? res?.data ?? res;
+            if (created?.id) addProductToCache(created);
+            else queryClient.invalidateQueries({ queryKey: ["products", selectedBranchId], exact: false });
             setProdDialog(false);
         },
         onError: () => toast.error("Mahsulot yaratishda xatolik"),
     });
 
     const updateProductMutation = useMutation({
-        mutationFn: ({
-            id,
-            data,
-        }: {
-            id: string;
-            data: Parameters<typeof productService.update>[1];
-        }) => productService.update(id, data),
-        onSuccess: () => {
+        mutationFn: ({ id, formData }: { id: string; formData: FormData }) =>
+            api.patch(`/product/${id}`, formData, { headers: { "Content-Type": "multipart/form-data" } }),
+        onSuccess: (res) => {
             toast.success("Mahsulot yangilandi");
-            queryClient.invalidateQueries({
-                queryKey: ["products", selectedBranchId],
-            });
+            const updated: Product = res?.data?.data ?? res?.data ?? res;
+            if (updated?.id) updateProductInCache(updated);
             setProdDialog(false);
         },
         onError: () => toast.error("Mahsulot yangilashda xatolik"),
@@ -256,11 +571,9 @@ export default function ManagerProducts() {
 
     const deleteProductMutation = useMutation({
         mutationFn: (id: string) => productService.delete(id),
-        onSuccess: () => {
+        onSuccess: (_, id) => {
             toast.success("Mahsulot o'chirildi");
-            queryClient.invalidateQueries({
-                queryKey: ["products", selectedBranchId],
-            });
+            removeProductFromCache(id);
             setDeleteProdId(null);
         },
         onError: () => toast.error("O'chirishda xatolik"),
@@ -268,45 +581,34 @@ export default function ManagerProducts() {
 
     const toggleProductMutation = useMutation({
         mutationFn: (id: string) => productService.toggleStatus(id),
-        onSuccess: () =>
-            queryClient.invalidateQueries({
-                queryKey: ["products", selectedBranchId],
-            }),
-        onError: () => {
-            toast.error("Holat o'zgartirishda xatolik");
-            queryClient.invalidateQueries({
-                queryKey: ["products", selectedBranchId],
-            });
+        onSuccess: (res) => {
+            const updated: Product = res?.data?.data ?? res?.data ?? res;
+            if (updated?.id) updateProductInCache(updated);
         },
+        onError: () => toast.error("Holat o'zgartirishda xatolik"),
     });
 
     // ─── Category mutations ───────────────────────────────────────────────────
     const createCategoryMutation = useMutation({
-        mutationFn: (data: Parameters<typeof categoryService.create>[0]) =>
-            categoryService.create(data),
-        onSuccess: () => {
+        mutationFn: (formData: FormData) =>
+            api.post("/category", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+        onSuccess: (res) => {
             toast.success("Kategoriya yaratildi");
-            queryClient.invalidateQueries({
-                queryKey: ["categories", selectedBranchId],
-            });
+            const created: ProductCategory = res?.data?.data ?? res?.data ?? res;
+            if (created?.id) addCategoryToCache(created);
+            else queryClient.invalidateQueries({ queryKey: ["categories", selectedBranchId] });
             setCatDialog(false);
         },
         onError: () => toast.error("Kategoriya yaratishda xatolik"),
     });
 
     const updateCategoryMutation = useMutation({
-        mutationFn: ({
-            id,
-            data,
-        }: {
-            id: string;
-            data: Parameters<typeof categoryService.update>[1];
-        }) => categoryService.update(id, data),
-        onSuccess: () => {
+        mutationFn: ({ id, data }: { id: string; data: { name: string } }) =>
+            api.patch(`/category/${id}`, data),
+        onSuccess: (res) => {
             toast.success("Kategoriya yangilandi");
-            queryClient.invalidateQueries({
-                queryKey: ["categories", selectedBranchId],
-            });
+            const updated: ProductCategory = res?.data?.data ?? res?.data ?? res;
+            if (updated?.id) updateCategoryInCache(updated);
             setCatDialog(false);
         },
         onError: () => toast.error("Kategoriya yangilashda xatolik"),
@@ -314,14 +616,11 @@ export default function ManagerProducts() {
 
     const deleteCategoryMutation = useMutation({
         mutationFn: (id: string) => categoryService.delete(id),
-        onSuccess: () => {
+        onSuccess: (_, id) => {
             toast.success("Kategoriya o'chirildi");
-            queryClient.invalidateQueries({
-                queryKey: ["categories", selectedBranchId],
-            });
-            queryClient.invalidateQueries({
-                queryKey: ["products", selectedBranchId],
-            });
+            removeCategoryFromCache(id);
+            queryClient.invalidateQueries({ queryKey: ["products", selectedBranchId], exact: false });
+            queryClient.invalidateQueries({ queryKey: ["products-all", selectedBranchId] });
             setDeleteCatId(null);
         },
         onError: () => toast.error("O'chirishda xatolik"),
@@ -329,27 +628,21 @@ export default function ManagerProducts() {
 
     const toggleCategoryMutation = useMutation({
         mutationFn: (id: string) => categoryService.toggleStatus(id),
-        onSuccess: () =>
-            queryClient.invalidateQueries({
-                queryKey: ["categories", selectedBranchId],
-            }),
-        onError: () => {
-            toast.error("Holat o'zgartirishda xatolik");
-            queryClient.invalidateQueries({
-                queryKey: ["categories", selectedBranchId],
-            });
+        onSuccess: (res) => {
+            const updated: ProductCategory = res?.data?.data ?? res?.data ?? res;
+            if (updated?.id) updateCategoryInCache(updated);
         },
+        onError: () => toast.error("Holat o'zgartirishda xatolik"),
     });
 
-    // ─── Popular Product mutations ────────────────────────────────────────────
+    // ─── Popular mutations ────────────────────────────────────────────────────
     const createPopularMutation = useMutation({
-        mutationFn: (data: { productId: string; branchId: string }) =>
-            popularProductService.create(data),
-        onSuccess: () => {
+        mutationFn: (data: { productId: string; branchId: string }) => popularProductService.create(data),
+        onSuccess: (res) => {
             toast.success("Tezkor mahsulotga qo'shildi");
-            queryClient.invalidateQueries({
-                queryKey: ["popular-products", selectedBranchId],
-            });
+            const created: PopularProduct = res?.data?.data ?? res?.data ?? res;
+            if (created?.id) addPopularToCache(created);
+            else queryClient.invalidateQueries({ queryKey: ["popular-products", selectedBranchId] });
             setPopularDialog(false);
             setSelectedProductId("");
         },
@@ -358,85 +651,68 @@ export default function ManagerProducts() {
 
     const deletePopularMutation = useMutation({
         mutationFn: (id: string) => popularProductService.delete(id),
-        onSuccess: () => {
+        onSuccess: (_, id) => {
             toast.success("Tezkor mahsulotdan o'chirildi");
-            queryClient.invalidateQueries({
-                queryKey: ["popular-products", selectedBranchId],
-            });
+            removePopularFromCache(id);
             setDeletePopularId(null);
         },
         onError: () => toast.error("O'chirishda xatolik"),
     });
 
-    // ─── Filtered ─────────────────────────────────────────────────────────────
-    const filteredProducts = productsList.filter((p) => {
-        const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-        const matchCat = catFilter === "ALL" || p.productCategoryId === catFilter;
-        return matchSearch && matchCat;
-    });
-
-    const availableForPopular = productsList.filter(
-        (p) =>
-            p.status === "ACTIVE" &&
-            !popularList.some((pop) => pop.productId === p.id)
+    // ─── Computed ─────────────────────────────────────────────────────────────
+    const availableForPopular = allProducts.filter(
+        (p) => p.status === "ACTIVE" && !popularList.some((pop) => pop.productId === p.id)
     );
+    const activeFilterCount = [debouncedSearch ? 1 : 0, catFilter !== "ALL" ? 1 : 0].reduce((a, b) => a + b, 0);
 
     // ─── Product handlers ─────────────────────────────────────────────────────
     const openAddProd = () => {
         setEditProd(null);
-        setProdForm({
-            name: "",
-            desc: "",
-            price: "",
-            productCategoryId: activeCats[0]?.id || "",
-            kitchenId: "",
-        });
+        setProdPhoto(null);
+        setProdForm({ name: "", desc: "", price: "", amount: "0", unit: "DONA", productCategoryId: activeCats[0]?.id || "", kitchenId: "" });
         setProdDialog(true);
     };
 
     const openEditProd = (p: Product) => {
         setEditProd(p);
+        setProdPhoto(null);
         setProdForm({
-            name: p.name,
-            desc: p.desc,
-            price: String(p.price),
-            productCategoryId: p.productCategoryId,
-            kitchenId: p.kitchenId || "",
+            name: p.name, desc: p.desc || "", price: String(p.price),
+            amount: String(p.amount), unit: p.unit || "DONA",
+            productCategoryId: p.productCategoryId, kitchenId: p.kitchenId || "",
         });
         setProdDialog(true);
     };
 
     const saveProd = () => {
         if (!prodForm.name.trim()) return toast.error("Mahsulot nomini kiriting");
-        if (!prodForm.price || isNaN(Number(prodForm.price)))
-            return toast.error("Narxni to'g'ri kiriting");
+        if (!prodForm.price || isNaN(Number(prodForm.price))) return toast.error("Narxni to'g'ri kiriting");
         if (!prodForm.productCategoryId) return toast.error("Kategoriyani tanlang");
 
-        // kitchenId optional — bo'sh bo'lsa undefined yuboramiz
-        const kitchenId = prodForm.kitchenId || undefined;
+        const fd = new FormData();
+        fd.append("name", prodForm.name);
+        fd.append("desc", prodForm.desc);
+        fd.append("price", prodForm.price);
+        fd.append("amount", prodForm.amount || "0");
+        fd.append("unit", prodForm.unit);
+        fd.append("productCategoryId", prodForm.productCategoryId);
+        if (prodForm.kitchenId) fd.append("kitchenId", prodForm.kitchenId);
+        if (prodPhoto) fd.append("photo", prodPhoto);
 
         if (editProd) {
-            updateProductMutation.mutate({
-                id: editProd.id,
-                data: {
-                    name: prodForm.name,
-                    desc: prodForm.desc,
-                    price: Number(prodForm.price),
-                    productCategoryId: prodForm.productCategoryId,
-                    kitchenId,
-                },
-            });
+            // PATCH: branchId YUBORILMAYDI
+            updateProductMutation.mutate({ id: editProd.id, formData: fd });
         } else {
-            createProductMutation.mutate({
-                name: prodForm.name,
-                desc: prodForm.desc,
-                price: Number(prodForm.price),
-                amount: 0,
-                unit: "DONA",
-                branchId: selectedBranchId,
-                productCategoryId: prodForm.productCategoryId,
-                kitchenId,
-            });
+            // POST: branchId kerak
+            fd.append("branchId", selectedBranchId);
+            createProductMutation.mutate(fd);
+        }
+    };
+
+    const handleProdKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === "Enter" && !e.shiftKey && (e.target as HTMLElement).tagName !== "BUTTON") {
+            e.preventDefault();
+            saveProd();
         }
     };
 
@@ -444,43 +720,44 @@ export default function ManagerProducts() {
     const openAddCat = () => {
         setEditCat(null);
         setCatName("");
+        setCatIcon(null);
         setCatDialog(true);
     };
 
     const openEditCat = (c: ProductCategory) => {
         setEditCat(c);
         setCatName(c.name);
+        setCatIcon(null);
         setCatDialog(true);
     };
 
     const saveCat = () => {
         if (!catName.trim()) return toast.error("Kategoriya nomini kiriting");
+
         if (editCat) {
+            // PATCH /category/:id — faqat name JSON bilan
             updateCategoryMutation.mutate({ id: editCat.id, data: { name: catName } });
         } else {
-            createCategoryMutation.mutate({ name: catName, branchId: selectedBranchId });
+            // POST /category — multipart (name + branchId + icon ixtiyoriy)
+            const fd = new FormData();
+            fd.append("name", catName);
+            fd.append("branchId", selectedBranchId);
+            if (catIcon) fd.append("icon", catIcon);
+            createCategoryMutation.mutate(fd);
         }
     };
 
-    // ─── Popular handlers ─────────────────────────────────────────────────────
-    const openAddPopular = () => {
-        setSelectedProductId("");
-        setPopularDialog(true);
+    const handleCatKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === "Enter" && !e.shiftKey && (e.target as HTMLElement).tagName !== "BUTTON") {
+            e.preventDefault();
+            saveCat();
+        }
     };
 
-    const savePopular = () => {
-        if (!selectedProductId) return toast.error("Mahsulotni tanlang");
-        createPopularMutation.mutate({
-            productId: selectedProductId,
-            branchId: selectedBranchId,
-        });
-    };
+    const clearFilters = () => { setSearch(""); setCatFilter("ALL"); setPage(1); };
 
-    const isProdSaving =
-        createProductMutation.isPending || updateProductMutation.isPending;
-    const isCatSaving =
-        createCategoryMutation.isPending || updateCategoryMutation.isPending;
-    const isPopularSaving = createPopularMutation.isPending;
+    const isProdSaving = createProductMutation.isPending || updateProductMutation.isPending;
+    const isCatSaving = createCategoryMutation.isPending || updateCategoryMutation.isPending;
 
     // ─── Render ───────────────────────────────────────────────────────────────
     return (
@@ -493,13 +770,8 @@ export default function ManagerProducts() {
                         Filial bo'yicha mahsulot va kategoriyalarni boshqaring
                     </p>
                 </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => { refetchCats(); refetchProds(); refetchPopular(); }}
-                    className="gap-1.5"
-                    disabled={!selectedBranchId}
-                >
+                <Button variant="outline" size="sm" className="gap-1.5" disabled={!selectedBranchId}
+                    onClick={() => { refetchCats(); refetchProds(); refetchPopular(); }}>
                     <RefreshCw className="h-3.5 w-3.5" /> Yangilash
                 </Button>
             </div>
@@ -511,9 +783,7 @@ export default function ManagerProducts() {
                         <Loader2 className="h-4 w-4 animate-spin" /> Filiallar yuklanmoqda...
                     </div>
                 ) : branches.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center">
-                        Hech qanday filial topilmadi
-                    </p>
+                    <p className="text-sm text-muted-foreground text-center">Hech qanday filial topilmadi</p>
                 ) : (
                     <div className="flex items-center gap-4 flex-wrap">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -529,20 +799,17 @@ export default function ManagerProducts() {
                                     <SelectContent>
                                         {branches.map((b) => (
                                             <SelectItem key={b.id} value={b.id}>
-                                                <div className="flex flex-col py-0.5">
-                                                    <span className="font-medium">{b.name}</span>
-                                                </div>
+                                                <span className="font-medium">{b.name}</span>
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                         </div>
-
                         {selectedBranchId && (
                             <div className="flex gap-5 text-center shrink-0">
                                 <div>
-                                    <p className="text-lg font-bold">{productsList.length}</p>
+                                    <p className="text-lg font-bold">{prodsTotal}</p>
                                     <p className="text-xs text-muted-foreground">Mahsulot</p>
                                 </div>
                                 <div className="w-px bg-border" />
@@ -553,7 +820,7 @@ export default function ManagerProducts() {
                                 <div className="w-px bg-border" />
                                 <div>
                                     <p className="text-lg font-bold text-green-600">
-                                        {productsList.filter((p) => p.status === "ACTIVE").length}
+                                        {allProducts.filter((p) => p.status === "ACTIVE").length}
                                     </p>
                                     <p className="text-xs text-muted-foreground">Faol</p>
                                 </div>
@@ -577,66 +844,78 @@ export default function ManagerProducts() {
                     <TabsList className="mb-4">
                         <TabsTrigger value="products">
                             Mahsulotlar
-                            {productsList.length > 0 && (
-                                <Badge variant="secondary" className="ml-1.5 px-1.5 text-xs">
-                                    {productsList.length}
-                                </Badge>
-                            )}
+                            {prodsTotal > 0 && <Badge variant="secondary" className="ml-1.5 px-1.5 text-xs">{prodsTotal}</Badge>}
                         </TabsTrigger>
                         <TabsTrigger value="categories">
                             Kategoriyalar
-                            {categories.length > 0 && (
-                                <Badge variant="secondary" className="ml-1.5 px-1.5 text-xs">
-                                    {categories.length}
-                                </Badge>
-                            )}
+                            {categories.length > 0 && <Badge variant="secondary" className="ml-1.5 px-1.5 text-xs">{categories.length}</Badge>}
                         </TabsTrigger>
                         <TabsTrigger value="popular">
                             <Star className="h-3.5 w-3.5 mr-1" />
                             Tezkor Mahsulotlar
-                            {popularList.length > 0 && (
-                                <Badge variant="secondary" className="ml-1.5 px-1.5 text-xs">
-                                    {popularList.length}
-                                </Badge>
-                            )}
+                            {popularList.length > 0 && <Badge variant="secondary" className="ml-1.5 px-1.5 text-xs">{popularList.length}</Badge>}
                         </TabsTrigger>
                     </TabsList>
 
-                    {/* ══ Products ══════════════════════════════════════════════════════ */}
+                    {/* ══ Products Tab ══════════════════════════════════════════════════ */}
                     <TabsContent value="products">
-                        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-                            <div className="flex gap-2 flex-1 min-w-0">
-                                <Input
-                                    placeholder="Mahsulot qidirish..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="max-w-xs"
-                                />
-                                <Select value={catFilter} onValueChange={setCatFilter}>
-                                    <SelectTrigger className="w-52">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="ALL">Barcha kategoriyalar</SelectItem>
-                                        {categories.map((c) => (
-                                            <SelectItem key={c.id} value={c.id}>
-                                                <div className="flex items-center gap-2">
-                                                    {c.name}
-                                                    {c.status === "INACTIVE" && (
-                                                        <Badge variant="outline" className="text-xs py-0 px-1">
-                                                            Nofaol
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                        {/* Filter Bar */}
+                        <Card className="p-3 mb-4 border-border/60">
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <div className="relative flex-1 min-w-[200px] max-w-xs">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                                    <Input placeholder="Mahsulot qidirish..." value={search}
+                                        onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+                                    {search && (
+                                        <button onClick={() => setSearch("")}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <Select value={catFilter} onValueChange={setCatFilter}>
+                                        <SelectTrigger className="h-9 w-52 text-sm">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="ALL">Barcha kategoriyalar</SelectItem>
+                                            {categories.map((c) => (
+                                                <SelectItem key={c.id} value={c.id}>
+                                                    <div className="flex items-center gap-2">
+                                                        {c.icon && (
+                                                            <img src={`${import.meta.env.VITE_API_URL}/image/${c.icon}`}
+                                                                alt="" className="h-4 w-4 rounded object-cover" />
+                                                        )}
+                                                        {c.name}
+                                                        {c.status === "INACTIVE" && (
+                                                            <Badge variant="outline" className="text-xs py-0 px-1">Nofaol</Badge>
+                                                        )}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {activeFilterCount > 0 && (
+                                    <Button variant="ghost" size="sm" onClick={clearFilters}
+                                        className="h-9 gap-1.5 text-muted-foreground hover:text-foreground">
+                                        <X className="h-3.5 w-3.5" /> Filtrni tozalash
+                                        <Badge variant="secondary" className="ml-0.5 px-1.5 text-xs">{activeFilterCount}</Badge>
+                                    </Button>
+                                )}
+                                <div className="flex-1" />
+                                {prodsFetching && !prodsLoading && (
+                                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <Loader2 className="h-3 w-3 animate-spin" /> Yangilanmoqda...
+                                    </span>
+                                )}
+                                <Button onClick={openAddProd} size="sm" className="h-9" disabled={activeCats.length === 0}>
+                                    <Plus className="h-4 w-4 mr-1" /> Mahsulot qo'shish
+                                </Button>
                             </div>
-                            <Button onClick={openAddProd} size="sm" disabled={activeCats.length === 0}>
-                                <Plus className="h-4 w-4 mr-1" /> Mahsulot qo'shish
-                            </Button>
-                        </div>
+                        </Card>
 
                         {activeCats.length === 0 && !catsLoading && (
                             <div className="text-center py-3 text-sm text-amber-700 bg-amber-50 rounded-lg border border-amber-200 mb-4">
@@ -644,87 +923,94 @@ export default function ManagerProducts() {
                             </div>
                         )}
 
-                        <Card>
+                        <Card className="overflow-hidden">
                             <Table>
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Nomi</TableHead>
-                                        <TableHead>Tavsif</TableHead>
-                                        <TableHead>Kategoriya</TableHead>
-                                        <TableHead>Narx</TableHead>
-                                        <TableHead>Holat</TableHead>
-                                        <TableHead className="text-right">Amallar</TableHead>
+                                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                                        <TableHead className="font-semibold">Nomi</TableHead>
+                                        <TableHead className="font-semibold">Kategoriya</TableHead>
+                                        <TableHead className="font-semibold">Narx</TableHead>
+                                        <TableHead className="font-semibold">Birlik</TableHead>
+                                        <TableHead className="font-semibold">Holat</TableHead>
+                                        <TableHead className="text-right font-semibold">Amallar</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {prodsLoading ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-10">
-                                                <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+                                            <TableCell colSpan={6} className="text-center py-16">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                                    <span className="text-sm text-muted-foreground">Yuklanmoqda...</span>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
-                                    ) : filteredProducts.length === 0 ? (
+                                    ) : productsList.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
-                                                {search || catFilter !== "ALL"
-                                                    ? "Qidiruv natijasi topilmadi"
-                                                    : "Mahsulotlar mavjud emas"}
+                                            <TableCell colSpan={6} className="text-center py-16">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <Search className="h-8 w-8 text-muted-foreground/40" />
+                                                    <p className="text-sm font-medium text-muted-foreground">
+                                                        {debouncedSearch || catFilter !== "ALL"
+                                                            ? "Qidiruv natijasi topilmadi"
+                                                            : "Mahsulotlar mavjud emas"}
+                                                    </p>
+                                                    {(debouncedSearch || catFilter !== "ALL") && (
+                                                        <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs mt-1">
+                                                            Filtrni tozalash
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        filteredProducts.map((p) => {
+                                        productsList.map((p) => {
                                             const cat = categories.find((c) => c.id === p.productCategoryId);
                                             const isPopular = popularList.some((pop) => pop.productId === p.id);
+                                            const unitLabel = UNIT_OPTIONS.find(u => u.value === p.unit)?.label || p.unit;
                                             return (
-                                                <TableRow key={p.id}>
+                                                <TableRow key={p.id} className={`transition-opacity ${prodsFetching ? "opacity-60" : ""}`}>
                                                     <TableCell className="font-medium">
                                                         <div className="flex items-center gap-2">
                                                             {p.name}
-                                                            {isPopular && (
-                                                                <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                                                            )}
+                                                            {isPopular && <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />}
                                                         </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground max-w-[200px] truncate text-sm">
-                                                        {p.desc || "—"}
+                                                        {p.desc && (
+                                                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">{p.desc}</p>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell>
                                                         {cat ? (
-                                                            <Badge variant="secondary">{cat.name}</Badge>
+                                                            <div className="flex items-center gap-1.5">
+                                                                {cat.icon && (
+                                                                    <img src={`${import.meta.env.VITE_API_URL}/image/${cat.icon}`}
+                                                                        alt="" className="h-4 w-4 rounded object-cover" />
+                                                                )}
+                                                                <Badge variant="secondary">{cat.name}</Badge>
+                                                            </div>
                                                         ) : (
                                                             <span className="text-muted-foreground text-sm">—</span>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className="font-semibold">
-                                                        {formatPrice(p.price)}
+                                                    <TableCell className="font-semibold">{formatPrice(p.price)}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className="text-xs">{unitLabel}</Badge>
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
-                                                            <Switch
-                                                                checked={p.status === "ACTIVE"}
+                                                            <Switch checked={p.status === "ACTIVE"}
                                                                 onCheckedChange={() => toggleProductMutation.mutate(p.id)}
-                                                                disabled={toggleProductMutation.isPending}
-                                                            />
-                                                            <Badge
-                                                                variant={p.status === "ACTIVE" ? "default" : "secondary"}
-                                                                className="text-xs"
-                                                            >
+                                                                disabled={toggleProductMutation.isPending} />
+                                                            <Badge variant={p.status === "ACTIVE" ? "default" : "secondary"} className="text-xs">
                                                                 {statusLabels[p.status]}
                                                             </Badge>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right space-x-1">
-                                                        <Button variant="ghost" size="sm" onClick={() => openEditProd(p)}>
-                                                            Tahrirlash
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
+                                                        <Button variant="ghost" size="sm" onClick={() => openEditProd(p)}>Tahrirlash</Button>
+                                                        <Button variant="ghost" size="sm"
                                                             className="text-destructive hover:text-destructive"
-                                                            onClick={() => setDeleteProdId(p.id)}
-                                                        >
-                                                            O'chirish
-                                                        </Button>
+                                                            onClick={() => setDeleteProdId(p.id)}>O'chirish</Button>
                                                     </TableCell>
                                                 </TableRow>
                                             );
@@ -732,29 +1018,31 @@ export default function ManagerProducts() {
                                     )}
                                 </TableBody>
                             </Table>
+                            {(prodsTotal > 0 || prodsTotalPages > 1) && (
+                                <Pagination page={page} totalPages={prodsTotalPages} total={prodsTotal}
+                                    limit={limit} onPageChange={setPage} onLimitChange={setLimit} isLoading={prodsLoading} />
+                            )}
                         </Card>
                     </TabsContent>
 
-                    {/* ══ Categories ════════════════════════════════════════════════════ */}
+                    {/* ══ Categories Tab ════════════════════════════════════════════════ */}
                     <TabsContent value="categories">
                         <div className="flex items-center justify-between mb-4">
                             <p className="text-sm text-muted-foreground">
-                                <span className="font-medium text-foreground">{selectedBranch?.name}</span>{" "}
-                                filialining kategoriyalari
+                                <span className="font-medium text-foreground">{selectedBranch?.name}</span> filialining kategoriyalari
                             </p>
                             <Button onClick={openAddCat} size="sm">
                                 <Plus className="h-4 w-4 mr-1" /> Kategoriya qo'shish
                             </Button>
                         </div>
-
                         <Card>
                             <Table>
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Nomi</TableHead>
-                                        <TableHead>Mahsulotlar</TableHead>
-                                        <TableHead>Holat</TableHead>
-                                        <TableHead className="text-right">Amallar</TableHead>
+                                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                                        <TableHead className="font-semibold">Nomi</TableHead>
+                                        <TableHead className="font-semibold">Mahsulotlar</TableHead>
+                                        <TableHead className="font-semibold">Holat</TableHead>
+                                        <TableHead className="text-right font-semibold">Amallar</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -772,42 +1060,37 @@ export default function ManagerProducts() {
                                         </TableRow>
                                     ) : (
                                         categories.map((c) => {
-                                            const prodCount = productsList.filter(
-                                                (p) => p.productCategoryId === c.id
-                                            ).length;
+                                            const prodCount = allProducts.filter((p) => p.productCategoryId === c.id).length;
                                             return (
                                                 <TableRow key={c.id}>
-                                                    <TableCell className="font-medium">{c.name}</TableCell>
+                                                    <TableCell className="font-medium">
+                                                        <div className="flex items-center gap-2">
+                                                            {c.icon && (
+                                                                <img src={`${import.meta.env.VITE_API_URL}/image/${c.icon}`}
+                                                                    alt={c.name}
+                                                                    className="h-6 w-6 rounded object-cover border border-border" />
+                                                            )}
+                                                            {c.name}
+                                                        </div>
+                                                    </TableCell>
                                                     <TableCell>
                                                         <Badge variant="secondary">{prodCount} ta</Badge>
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
-                                                            <Switch
-                                                                checked={c.status === "ACTIVE"}
+                                                            <Switch checked={c.status === "ACTIVE"}
                                                                 onCheckedChange={() => toggleCategoryMutation.mutate(c.id)}
-                                                                disabled={toggleCategoryMutation.isPending}
-                                                            />
-                                                            <Badge
-                                                                variant={c.status === "ACTIVE" ? "default" : "secondary"}
-                                                                className="text-xs"
-                                                            >
+                                                                disabled={toggleCategoryMutation.isPending} />
+                                                            <Badge variant={c.status === "ACTIVE" ? "default" : "secondary"} className="text-xs">
                                                                 {statusLabels[c.status]}
                                                             </Badge>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right space-x-1">
-                                                        <Button variant="ghost" size="sm" onClick={() => openEditCat(c)}>
-                                                            Tahrirlash
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
+                                                        <Button variant="ghost" size="sm" onClick={() => openEditCat(c)}>Tahrirlash</Button>
+                                                        <Button variant="ghost" size="sm"
                                                             className="text-destructive hover:text-destructive"
-                                                            onClick={() => setDeleteCatId(c.id)}
-                                                        >
-                                                            O'chirish
-                                                        </Button>
+                                                            onClick={() => setDeleteCatId(c.id)}>O'chirish</Button>
                                                     </TableCell>
                                                 </TableRow>
                                             );
@@ -818,38 +1101,31 @@ export default function ManagerProducts() {
                         </Card>
                     </TabsContent>
 
-                    {/* ══ Popular Products ══════════════════════════════════════════════ */}
+                    {/* ══ Popular Tab ═══════════════════════════════════════════════════ */}
                     <TabsContent value="popular">
                         <div className="flex items-center justify-between mb-4">
                             <div>
                                 <p className="text-sm font-medium text-foreground">Tezkor mahsulotlar</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Afitsantlar uchun tez buyurtma berish imkoniyati
-                                </p>
+                                <p className="text-xs text-muted-foreground">Afitsantlar uchun tez buyurtma berish imkoniyati</p>
                             </div>
-                            <Button
-                                onClick={openAddPopular}
-                                size="sm"
-                                disabled={availableForPopular.length === 0}
-                            >
+                            <Button onClick={() => { setSelectedProductId(""); setPopularDialog(true); }}
+                                size="sm" disabled={availableForPopular.length === 0}>
                                 <Plus className="h-4 w-4 mr-1" /> Qo'shish
                             </Button>
                         </div>
-
-                        {availableForPopular.length === 0 && !popularLoading && (
+                        {availableForPopular.length === 0 && !popularLoading && allProducts.some(p => p.status === "ACTIVE") && (
                             <div className="text-center py-3 text-sm text-amber-700 bg-amber-50 rounded-lg border border-amber-200 mb-4">
                                 ⚠️ Barcha faol mahsulotlar allaqachon tezkor ro'yxatda
                             </div>
                         )}
-
                         <Card>
                             <Table>
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Mahsulot</TableHead>
-                                        <TableHead>Kategoriya</TableHead>
-                                        <TableHead>Narx</TableHead>
-                                        <TableHead className="text-right">Amallar</TableHead>
+                                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                                        <TableHead className="font-semibold">Mahsulot</TableHead>
+                                        <TableHead className="font-semibold">Kategoriya</TableHead>
+                                        <TableHead className="font-semibold">Narx</TableHead>
+                                        <TableHead className="text-right font-semibold">Amallar</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -867,21 +1143,25 @@ export default function ManagerProducts() {
                                         </TableRow>
                                     ) : (
                                         popularList.map((pop) => {
-                                            const product = productsList.find((p) => p.id === pop.productId);
-                                            const cat = categories.find(
-                                                (c) => c.id === product?.productCategoryId
-                                            );
+                                            const product = allProducts.find((p) => p.id === pop.productId);
+                                            const cat = categories.find((c) => c.id === product?.productCategoryId);
                                             return (
                                                 <TableRow key={pop.id}>
                                                     <TableCell className="font-medium">
                                                         <div className="flex items-center gap-2">
-                                                            <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+                                                            <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
                                                             {product?.name || "—"}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
                                                         {cat ? (
-                                                            <Badge variant="secondary">{cat.name}</Badge>
+                                                            <div className="flex items-center gap-1.5">
+                                                                {cat.icon && (
+                                                                    <img src={`${import.meta.env.VITE_API_URL}/image/${cat.icon}`}
+                                                                        alt="" className="h-4 w-4 rounded object-cover" />
+                                                                )}
+                                                                <Badge variant="secondary">{cat.name}</Badge>
+                                                            </div>
                                                         ) : (
                                                             <span className="text-muted-foreground text-sm">—</span>
                                                         )}
@@ -890,12 +1170,9 @@ export default function ManagerProducts() {
                                                         {product ? formatPrice(product.price) : "—"}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
+                                                        <Button variant="ghost" size="sm"
                                                             className="text-destructive hover:text-destructive"
-                                                            onClick={() => setDeletePopularId(pop.id)}
-                                                        >
+                                                            onClick={() => setDeletePopularId(pop.id)}>
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                     </TableCell>
@@ -912,7 +1189,7 @@ export default function ManagerProducts() {
 
             {/* ══ Product Dialog ════════════════════════════════════════════════════ */}
             <Dialog open={prodDialog} onOpenChange={setProdDialog}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-lg" onKeyDown={handleProdKeyDown}>
                     <DialogHeader>
                         <DialogTitle>
                             {editProd ? "Mahsulotni tahrirlash" : "Yangi mahsulot qo'shish"}
@@ -921,90 +1198,87 @@ export default function ManagerProducts() {
                     <div className="space-y-4 py-2">
                         <div className="space-y-1.5">
                             <Label>Nomi <span className="text-destructive">*</span></Label>
-                            <Input
-                                placeholder="Mahsulot nomini kiriting"
-                                value={prodForm.name}
-                                onChange={(e) => setProdForm({ ...prodForm, name: e.target.value })}
-                            />
+                            <Input placeholder="Mahsulot nomini kiriting" value={prodForm.name} autoFocus
+                                onChange={(e) => setProdForm({ ...prodForm, name: e.target.value })} />
                         </div>
 
                         <div className="space-y-1.5">
                             <Label>Tavsif</Label>
-                            <Input
-                                placeholder="Qisqacha tavsif (ixtiyoriy)"
-                                value={prodForm.desc}
-                                onChange={(e) => setProdForm({ ...prodForm, desc: e.target.value })}
-                            />
+                            <Input placeholder="Qisqacha tavsif (ixtiyoriy)" value={prodForm.desc}
+                                onChange={(e) => setProdForm({ ...prodForm, desc: e.target.value })} />
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                                 <Label>Narx (so'm) <span className="text-destructive">*</span></Label>
-                                <Input
-                                    type="number"
-                                    placeholder="0"
-                                    min={0}
-                                    value={prodForm.price}
-                                    onChange={(e) => setProdForm({ ...prodForm, price: e.target.value })}
-                                />
+                                <Input type="number" placeholder="0" min={0} value={prodForm.price}
+                                    onChange={(e) => setProdForm({ ...prodForm, price: e.target.value })} />
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Kategoriya <span className="text-destructive">*</span></Label>
-                                <Select
-                                    value={prodForm.productCategoryId}
-                                    onValueChange={(v) => setProdForm({ ...prodForm, productCategoryId: v })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Tanlang" />
-                                    </SelectTrigger>
+                                <Label>Birlik <span className="text-destructive">*</span></Label>
+                                <Select value={prodForm.unit} onValueChange={(v) => setProdForm({ ...prodForm, unit: v })}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        {activeCats.map((c) => (
-                                            <SelectItem key={c.id} value={c.id}>
-                                                {c.name}
-                                            </SelectItem>
+                                        {UNIT_OPTIONS.map((u) => (
+                                            <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                         </div>
 
-                        {/* Kitchen — optional */}
-                        <div className="space-y-1.5">
-                            <Label>
-                                Oshxona{" "}
-                                <span className="text-muted-foreground text-xs">(ixtiyoriy)</span>
-                            </Label>
-                            <Select
-                                value={prodForm.kitchenId || "NONE"}
-                                onValueChange={(v) =>
-                                    setProdForm({ ...prodForm, kitchenId: v === "NONE" ? "" : v })
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Tanlang (ixtiyoriy)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="NONE">— Tanlanmagan —</SelectItem>
-                                    {activeKitchens.map((k) => (
-                                        <SelectItem key={k.id} value={k.id}>
-                                            {k.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {activeKitchens.length === 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                    Bu filialda faol oshxona mavjud emas
-                                </p>
-                            )}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label>Kategoriya <span className="text-destructive">*</span></Label>
+                                <Select value={prodForm.productCategoryId}
+                                    onValueChange={(v) => setProdForm({ ...prodForm, productCategoryId: v })}>
+                                    <SelectTrigger><SelectValue placeholder="Tanlang" /></SelectTrigger>
+                                    <SelectContent>
+                                        {activeCats.map((c) => (
+                                            <SelectItem key={c.id} value={c.id}>
+                                                <div className="flex items-center gap-2">
+                                                    {c.icon && (
+                                                        <img src={`${import.meta.env.VITE_API_URL}/image/${c.icon}`}
+                                                            alt="" className="h-4 w-4 rounded object-cover" />
+                                                    )}
+                                                    {c.name}
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Oshxona <span className="text-muted-foreground text-xs">(ixtiyoriy)</span></Label>
+                                <Select value={prodForm.kitchenId || "NONE"}
+                                    onValueChange={(v) => setProdForm({ ...prodForm, kitchenId: v === "NONE" ? "" : v })}>
+                                    <SelectTrigger><SelectValue placeholder="Ixtiyoriy" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="NONE">— Tanlanmagan —</SelectItem>
+                                        {activeKitchens.map((k) => (
+                                            <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
+
+                        <ImageUpload
+                            value={prodPhoto}
+                            onChange={setProdPhoto}
+                            label="Mahsulot rasmi"
+                            hint="PNG, JPG • maks 5MB"
+                            existingUrl={
+                                editProd?.photo
+                                    ? `${import.meta.env.VITE_API_URL}/image/${editProd.photo}`
+                                    : null
+                            }
+                        />
 
                         <div className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2 flex items-center gap-1.5">
                             <MapPin className="h-3 w-3 shrink-0" />
-                            Filial:{" "}
-                            <span className="font-medium text-foreground ml-1">
-                                {selectedBranch?.name}
-                            </span>
+                            Filial: <span className="font-medium text-foreground ml-1">{selectedBranch?.name}</span>
+                            <span className="ml-auto opacity-60">Enter → saqlash</span>
                         </div>
                     </div>
                     <DialogFooter>
@@ -1021,7 +1295,7 @@ export default function ManagerProducts() {
 
             {/* ══ Category Dialog ═══════════════════════════════════════════════════ */}
             <Dialog open={catDialog} onOpenChange={setCatDialog}>
-                <DialogContent className="max-w-sm">
+                <DialogContent className="max-w-sm" onKeyDown={handleCatKeyDown}>
                     <DialogHeader>
                         <DialogTitle>
                             {editCat ? "Kategoriyani tahrirlash" : "Yangi kategoriya"}
@@ -1030,18 +1304,26 @@ export default function ManagerProducts() {
                     <div className="space-y-4 py-2">
                         <div className="space-y-1.5">
                             <Label>Nomi <span className="text-destructive">*</span></Label>
-                            <Input
-                                placeholder="Kategoriya nomini kiriting"
-                                value={catName}
-                                onChange={(e) => setCatName(e.target.value)}
-                            />
+                            <Input placeholder="Kategoriya nomini kiriting" value={catName} autoFocus
+                                onChange={(e) => setCatName(e.target.value)} />
                         </div>
+
+                        <ImageUpload
+                            value={catIcon}
+                            onChange={setCatIcon}
+                            label="Kategoriya ikonkasi"
+                            hint="PNG, JPG • maks 2MB"
+                            existingUrl={
+                                editCat?.icon
+                                    ? `${import.meta.env.VITE_API_URL}/image/${editCat.icon}`
+                                    : null
+                            }
+                        />
+
                         <div className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2 flex items-center gap-1.5">
                             <MapPin className="h-3 w-3 shrink-0" />
-                            Filial:{" "}
-                            <span className="font-medium text-foreground ml-1">
-                                {selectedBranch?.name}
-                            </span>
+                            Filial: <span className="font-medium text-foreground ml-1">{selectedBranch?.name}</span>
+                            <span className="ml-auto opacity-60">Enter → saqlash</span>
                         </div>
                     </div>
                     <DialogFooter>
@@ -1056,7 +1338,7 @@ export default function ManagerProducts() {
                 </DialogContent>
             </Dialog>
 
-            {/* ══ Popular Product Dialog ════════════════════════════════════════════ */}
+            {/* ══ Popular Dialog ════════════════════════════════════════════════════ */}
             <Dialog open={popularDialog} onOpenChange={setPopularDialog}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
@@ -1066,9 +1348,7 @@ export default function ManagerProducts() {
                         <div className="space-y-1.5">
                             <Label>Mahsulot <span className="text-destructive">*</span></Label>
                             <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Mahsulotni tanlang" />
-                                </SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="Mahsulotni tanlang" /></SelectTrigger>
                                 <SelectContent>
                                     {availableForPopular.map((p) => {
                                         const cat = categories.find((c) => c.id === p.productCategoryId);
@@ -1091,11 +1371,14 @@ export default function ManagerProducts() {
                         </p>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setPopularDialog(false)} disabled={isPopularSaving}>
+                        <Button variant="outline" onClick={() => setPopularDialog(false)} disabled={createPopularMutation.isPending}>
                             Bekor qilish
                         </Button>
-                        <Button onClick={savePopular} disabled={isPopularSaving}>
-                            {isPopularSaving && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+                        <Button onClick={() => {
+                            if (!selectedProductId) return toast.error("Mahsulotni tanlang");
+                            createPopularMutation.mutate({ productId: selectedProductId, branchId: selectedBranchId });
+                        }} disabled={createPopularMutation.isPending}>
+                            {createPopularMutation.isPending && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
                             Qo'shish
                         </Button>
                     </DialogFooter>
@@ -1107,20 +1390,14 @@ export default function ManagerProducts() {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Mahsulotni o'chirish</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Bu mahsulot butunlay o'chiriladi. Qaytarib bo'lmaydi.
-                        </AlertDialogDescription>
+                        <AlertDialogDescription>Bu mahsulot butunlay o'chiriladi. Qaytarib bo'lmaydi.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => deleteProdId && deleteProductMutation.mutate(deleteProdId)}
+                        <AlertDialogAction onClick={() => deleteProdId && deleteProductMutation.mutate(deleteProdId)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={deleteProductMutation.isPending}
-                        >
-                            {deleteProductMutation.isPending && (
-                                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                            )}
+                            disabled={deleteProductMutation.isPending}>
+                            {deleteProductMutation.isPending && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
                             O'chirish
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -1135,50 +1412,38 @@ export default function ManagerProducts() {
                         <AlertDialogDescription>
                             Unga bog'liq{" "}
                             <strong>
-                                {deleteCatId
-                                    ? productsList.filter((p) => p.productCategoryId === deleteCatId).length
-                                    : 0}{" "}
-                                ta mahsulot
+                                {deleteCatId ? allProducts.filter((p) => p.productCategoryId === deleteCatId).length : 0} ta mahsulot
                             </strong>{" "}
                             ham o'chishi mumkin. Davom etasizmi?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => deleteCatId && deleteCategoryMutation.mutate(deleteCatId)}
+                        <AlertDialogAction onClick={() => deleteCatId && deleteCategoryMutation.mutate(deleteCatId)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={deleteCategoryMutation.isPending}
-                        >
-                            {deleteCategoryMutation.isPending && (
-                                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                            )}
+                            disabled={deleteCategoryMutation.isPending}>
+                            {deleteCategoryMutation.isPending && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
                             O'chirish
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* ══ Delete Popular Product ════════════════════════════════════════════ */}
+            {/* ══ Delete Popular ════════════════════════════════════════════════════ */}
             <AlertDialog open={!!deletePopularId} onOpenChange={() => setDeletePopularId(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Tezkor mahsulotdan o'chirish</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Bu mahsulot tezkor ro'yxatdan olib tashlanadi. Asosiy mahsulotlar
-                            ro'yxatida qoladi.
+                            Bu mahsulot tezkor ro'yxatdan olib tashlanadi. Asosiy mahsulotlar ro'yxatida qoladi.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => deletePopularId && deletePopularMutation.mutate(deletePopularId)}
+                        <AlertDialogAction onClick={() => deletePopularId && deletePopularMutation.mutate(deletePopularId)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={deletePopularMutation.isPending}
-                        >
-                            {deletePopularMutation.isPending && (
-                                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                            )}
+                            disabled={deletePopularMutation.isPending}>
+                            {deletePopularMutation.isPending && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
                             O'chirish
                         </AlertDialogAction>
                     </AlertDialogFooter>
