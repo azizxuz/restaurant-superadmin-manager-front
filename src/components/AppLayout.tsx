@@ -9,6 +9,7 @@ import {
     GitBranch, ShoppingCart, Package, Menu, X, Settings,
     HomeIcon, ChefHat, Wallet,
     Receipt,
+    Monitor,
 } from 'lucide-react';
 
 interface NavItem {
@@ -35,6 +36,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
         { label: "Xonalar va zal", path: "/manager/rooms", icon: HomeIcon },
         { label: "Moliya", path: "/manager/finance", icon: Wallet },
         { label: "Xarajatlar", path: "/manager/expenses", icon: Receipt },
+        { label: "POS Terminallar", path: "/manager/pos", icon: Monitor },
         { label: "Profil", path: "/manager/profile", icon: User },
         { label: "Sozlamalar", path: "/manager/settings", icon: Settings },
     ],
@@ -72,9 +74,7 @@ export function AppLayout({ requiredRole }: AppLayoutProps) {
     const closeSidebar = () => setSidebarOpen(false);
 
     return (
-        // overflow-hidden — butun sahifa scroll bo'lmasligi uchun
         <div className="flex h-screen w-full overflow-hidden">
-
             {/* Mobile overlay */}
             {sidebarOpen && (
                 <div
@@ -83,7 +83,7 @@ export function AppLayout({ requiredRole }: AppLayoutProps) {
                 />
             )}
 
-            {/* ── Sidebar ── always fixed height, never scrolls with content */}
+            {/* Sidebar */}
             <aside className={`
         fixed lg:sticky lg:top-0
         inset-y-0 left-0 z-50
@@ -108,7 +108,7 @@ export function AppLayout({ requiredRole }: AppLayoutProps) {
                     </button>
                 </div>
 
-                {/* Nav — only this part scrolls inside sidebar */}
+                {/* Nav */}
                 <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
                     {navItems.map((item) => (
                         <NavLink
@@ -147,7 +147,7 @@ export function AppLayout({ requiredRole }: AppLayoutProps) {
                 </div>
             </aside>
 
-            {/* ── Main content — scrolls independently ── */}
+            {/* Main content */}
             <main className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
                 {/* Mobile topbar */}
                 <div className="sticky top-0 z-30 lg:hidden bg-background border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
@@ -156,7 +156,6 @@ export function AppLayout({ requiredRole }: AppLayoutProps) {
                     </button>
                     <span className="font-semibold text-foreground">Restourant</span>
                 </div>
-
                 <div className="flex-1 p-4 sm:p-6 lg:p-8">
                     <Outlet />
                 </div>
