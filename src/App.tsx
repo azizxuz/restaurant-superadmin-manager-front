@@ -24,7 +24,7 @@ import MStaff from "./pages/manager/Staff";
 import MProducts from "./pages/manager/Products";
 import MOrders from "./pages/manager/Orders";
 import MProfile from "./pages/manager/Profile";
-import MRooms from "./pages/manager/ManagerRooms"; // ← QO'SHILDI
+import MRooms from "./pages/manager/ManagerRooms";
 import Kitchens from "./pages/manager/Kitchens";
 import Finance from "./pages/manager/Finance";
 import Costs from "./pages/manager/Costs";
