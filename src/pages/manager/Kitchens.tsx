@@ -49,7 +49,7 @@ export default function Kitchens() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [editItem, setEditItem] = useState<Kitchen | null>(null);
-    const [form, setForm] = useState({ name: "", branchId: "" });
+    const [form, setForm] = useState({ name: "", branchId: "", posIp: "", posPort: "" });
 
     // ================= BRANCHES =================
     const { data: branchesList = [] } = useQuery({
@@ -94,23 +94,27 @@ export default function Kitchens() {
             kitchenService.create({
                 name: form.name,
                 branchId: form.branchId,
+                ...(form.posIp ? { posIp: form.posIp } : {}),
+                ...(form.posPort ? { posPort: form.posPort } : {}),
             }),
         onSuccess: () => {
             toast.success("Oshxona yaratildi");
             queryClient.invalidateQueries({ queryKey: ["kitchens", selectedBranchId] });
             setDialogOpen(false);
-            setForm({ name: "", branchId: selectedBranchId });
+            setForm({ name: "", branchId: selectedBranchId, posIp: "", posPort: "" });
         },
     });
 
     const updateMutation = useMutation({
         mutationFn: () =>
-            kitchenService.update(editItem!.id, form.name),
+            kitchenService.update(editItem!.id, {
+                name: form.name,
+                ...(form.posIp ? { posIp: form.posIp } : {}),
+                ...(form.posPort ? { posPort: form.posPort } : {}),
+            }),
         onSuccess: () => {
             toast.success("Oshxona yangilandi");
-            queryClient.invalidateQueries({
-                queryKey: ["kitchens", selectedBranchId],
-            });
+            queryClient.invalidateQueries({ queryKey: ["kitchens", selectedBranchId] });
             setDialogOpen(false);
             setEditItem(null);
         },
@@ -132,18 +136,17 @@ export default function Kitchens() {
         },
     });
 
-    const isSubmitting =
-        createMutation.isPending || updateMutation.isPending;
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
     const openAdd = () => {
         setEditItem(null);
-        setForm({ name: "", branchId: selectedBranchId });
+        setForm({ name: "", branchId: selectedBranchId, posIp: "", posPort: "" });
         setDialogOpen(true);
     };
 
     const openEdit = (k: Kitchen) => {
         setEditItem(k);
-        setForm({ name: k.name, branchId: k.branchId });
+        setForm({ name: k.name, branchId: k.branchId, posIp: k.posIp || "", posPort: k.posPort || "" });
         setDialogOpen(true);
     };
 
