@@ -112,7 +112,7 @@ export default function ManagerRooms() {
   // ─── Branches ─────────────────────────────────────────────────────────────
   const { data: branchesRaw, isLoading: branchesLoading } = useQuery({
     queryKey: ["branches-my"],
-    queryFn: () => branchService.getAll().then((r) => r.data),
+    queryFn: () => branchService.getAll(),
     staleTime: 5 * 60 * 1000,
   });
   const branches = toArray<BranchResponse>(branchesRaw);

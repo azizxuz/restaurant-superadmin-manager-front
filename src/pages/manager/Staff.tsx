@@ -82,7 +82,7 @@ export default function ManagerStaff() {
     queryFn: () => branchService.getAll(),
   });
 
-  const branchList: BranchResponse[] = branchData?.data || [];
+  const branchList: BranchResponse[] = Array.isArray(branchData) ? branchData : (branchData as any)?.data || [];
 
   // Birinchi filialni default qilib o'rnatish
   const activeBranchId = selectedBranchId || branchList[0]?.id || "";

@@ -24,7 +24,8 @@ export default function ManagerProfile() {
     queryFn: async () => {
       try {
         const res = await companyService.getMy();
-        return res.data?.data || res.data || null;
+        const d = res.data ?? res;
+        return (d as any)?.data || d || null;
       } catch {
         return mockCompanies.find(c => c.id === user?.companyId) || null;
       }
