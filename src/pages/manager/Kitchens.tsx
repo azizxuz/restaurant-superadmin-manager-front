@@ -49,7 +49,7 @@ export default function Kitchens() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [editItem, setEditItem] = useState<Kitchen | null>(null);
-    const [form, setForm] = useState({ name: "", branchId: "" });
+    const [form, setForm] = useState({ name: "", branchId: "", posIp: "", posPort: "" });
 
     // ================= BRANCHES =================
     const { data: branchesList = [] } = useQuery({
@@ -94,23 +94,27 @@ export default function Kitchens() {
             kitchenService.create({
                 name: form.name,
                 branchId: form.branchId,
+                ...(form.posIp ? { posIp: form.posIp } : {}),
+                ...(form.posPort ? { posPort: form.posPort } : {}),
             }),
         onSuccess: () => {
             toast.success("Oshxona yaratildi");
             queryClient.invalidateQueries({ queryKey: ["kitchens", selectedBranchId] });
             setDialogOpen(false);
-            setForm({ name: "", branchId: selectedBranchId });
+            setForm({ name: "", branchId: selectedBranchId, posIp: "", posPort: "" });
         },
     });
 
     const updateMutation = useMutation({
         mutationFn: () =>
-            kitchenService.update(editItem!.id, form.name),
+            kitchenService.update(editItem!.id, {
+                name: form.name,
+                ...(form.posIp ? { posIp: form.posIp } : {}),
+                ...(form.posPort ? { posPort: form.posPort } : {}),
+            }),
         onSuccess: () => {
             toast.success("Oshxona yangilandi");
-            queryClient.invalidateQueries({
-                queryKey: ["kitchens", selectedBranchId],
-            });
+            queryClient.invalidateQueries({ queryKey: ["kitchens", selectedBranchId] });
             setDialogOpen(false);
             setEditItem(null);
         },
@@ -132,18 +136,17 @@ export default function Kitchens() {
         },
     });
 
-    const isSubmitting =
-        createMutation.isPending || updateMutation.isPending;
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
     const openAdd = () => {
         setEditItem(null);
-        setForm({ name: "", branchId: selectedBranchId });
+        setForm({ name: "", branchId: selectedBranchId, posIp: "", posPort: "" });
         setDialogOpen(true);
     };
 
     const openEdit = (k: Kitchen) => {
         setEditItem(k);
-        setForm({ name: k.name, branchId: k.branchId });
+        setForm({ name: k.name, branchId: k.branchId, posIp: k.posIp || "", posPort: k.posPort || "" });
         setDialogOpen(true);
     };
 
@@ -189,6 +192,8 @@ export default function Kitchens() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nomi</TableHead>
+                            <TableHead>POS IP</TableHead>
+                            <TableHead>POS Port</TableHead>
                             <TableHead>Holat</TableHead>
                             <TableHead className="text-right">Amallar</TableHead>
                         </TableRow>
@@ -197,6 +202,8 @@ export default function Kitchens() {
                         {filtered.map((k: Kitchen) => (
                             <TableRow key={k.id}>
                                 <TableCell>{k.name}</TableCell>
+                                <TableCell>{k.posIp || "—"}</TableCell>
+                                <TableCell>{k.posPort || "—"}</TableCell>
                                 <TableCell>
                                     <Switch
                                         checked={k.status === "ACTIVE"}
@@ -222,7 +229,7 @@ export default function Kitchens() {
 
                         {filtered.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={3} className="text-center py-8">
+                                <TableCell colSpan={5} className="text-center py-8">
                                     Ma'lumot yo'q
                                 </TableCell>
                             </TableRow>
@@ -245,9 +252,23 @@ export default function Kitchens() {
                             <Label>Nomi</Label>
                             <Input
                                 value={form.name}
-                                onChange={(e) =>
-                                    setForm({ ...form, name: e.target.value })
-                                }
+                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <Label>POS IP manzili (ixtiyoriy)</Label>
+                            <Input
+                                placeholder="192.168.1.100"
+                                value={form.posIp}
+                                onChange={(e) => setForm({ ...form, posIp: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <Label>POS Port (ixtiyoriy)</Label>
+                            <Input
+                                placeholder="9100"
+                                value={form.posPort}
+                                onChange={(e) => setForm({ ...form, posPort: e.target.value })}
                             />
                         </div>
                     </div>

@@ -4,12 +4,22 @@ export interface Kitchen {
   id: string;
   name: string;
   branchId: string;
+  posIp?: string;
+  posPort?: string;
   status: "ACTIVE" | "INACTIVE";
 }
 
 export interface KitchenPayload {
   name: string;
   branchId: string;
+  posIp?: string;
+  posPort?: string;
+}
+
+export interface KitchenUpdatePayload {
+  name?: string;
+  posIp?: string;
+  posPort?: string;
 }
 
 export const kitchenService = {
@@ -19,8 +29,8 @@ export const kitchenService = {
   create: (data: KitchenPayload) =>
     api.post<Kitchen>("/kitchen", data),
 
-  update: (id: string, name: string) =>
-    api.patch<Kitchen>(`/kitchen/${id}`, { name }),
+  update: (id: string, data: KitchenUpdatePayload) =>
+    api.patch<Kitchen>(`/kitchen/${id}`, data),
 
   toggleStatus: (id: string) =>
     api.patch<Kitchen>(`/kitchen/status/${id}`),
