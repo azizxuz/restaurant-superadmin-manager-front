@@ -36,7 +36,7 @@ export default function ManagerBranches() {
         queryFn: () => branchService.getAll(),
     });
 
-    const branchList: BranchResponse[] = branchData?.data || [];
+    const branchList: BranchResponse[] = Array.isArray(branchData) ? branchData : (branchData as any)?.data || [];
 
     // 📦 Xodimlarni olish
     const { data: allUsersData } = useQuery({

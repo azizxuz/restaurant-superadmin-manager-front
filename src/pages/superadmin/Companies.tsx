@@ -395,7 +395,8 @@ export default function Companies() {
     queryKey: ["companies"],
     queryFn: async () => {
       const res = await companyService.getAll();
-      return res.data?.data || [];
+      const d = res.data ?? res;
+      return Array.isArray(d) ? d : (d as any)?.data || [];
     },
   });
 
