@@ -252,9 +252,23 @@ export default function Kitchens() {
                             <Label>Nomi</Label>
                             <Input
                                 value={form.name}
-                                onChange={(e) =>
-                                    setForm({ ...form, name: e.target.value })
-                                }
+                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <Label>POS IP manzili (ixtiyoriy)</Label>
+                            <Input
+                                placeholder="192.168.1.100"
+                                value={form.posIp}
+                                onChange={(e) => setForm({ ...form, posIp: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <Label>POS Port (ixtiyoriy)</Label>
+                            <Input
+                                placeholder="9100"
+                                value={form.posPort}
+                                onChange={(e) => setForm({ ...form, posPort: e.target.value })}
                             />
                         </div>
                     </div>
