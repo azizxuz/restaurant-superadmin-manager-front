@@ -192,6 +192,8 @@ export default function Kitchens() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nomi</TableHead>
+                            <TableHead>POS IP</TableHead>
+                            <TableHead>POS Port</TableHead>
                             <TableHead>Holat</TableHead>
                             <TableHead className="text-right">Amallar</TableHead>
                         </TableRow>
@@ -200,6 +202,8 @@ export default function Kitchens() {
                         {filtered.map((k: Kitchen) => (
                             <TableRow key={k.id}>
                                 <TableCell>{k.name}</TableCell>
+                                <TableCell>{k.posIp || "—"}</TableCell>
+                                <TableCell>{k.posPort || "—"}</TableCell>
                                 <TableCell>
                                     <Switch
                                         checked={k.status === "ACTIVE"}
@@ -225,7 +229,7 @@ export default function Kitchens() {
 
                         {filtered.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={3} className="text-center py-8">
+                                <TableCell colSpan={5} className="text-center py-8">
                                     Ma'lumot yo'q
                                 </TableCell>
                             </TableRow>
